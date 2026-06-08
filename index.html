@@ -3,26 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色记录卡册 v8</title>
+    <title>角色记录卡册 v9 - 置顶交互版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
-        body { background: #fdfdfd; font-family: sans-serif; overflow-x: hidden; }
+        body { background: #f8fafc; font-family: sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
         .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.4); }
         .exporting .glass { backdrop-filter: none !important; background: #fff !important; }
 
-        /* 绝对定位项的基础动画 */
-        .stick-item { position: absolute; transition: transform 0.3s ease; z-index: 10; pointer-events: auto; }
+        /* 贴纸基础样式 */
+        .stick-item { position: absolute; transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; touch-action: none; }
+        .stick-item:active { transform: scale(1.1) rotate(0deg) !important; z-index: 9999 !important; }
         
         /* 水色设定 */
         .water-chip { background: #CCF2F4; color: #008D96; border: 1px solid #A7E4E9; }
 
-        /* 细节墙容器 */
-        .details-wall-container { position: relative; width: 100%; transition: height 0.3s ease; }
-
-        /* 弹幕气泡修复 */
+        /* 气泡样式 */
         .bubble { position: relative; padding: 10px 18px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; display: inline-block; }
         .bubble-left { border-bottom-left-radius: 2px; }
         .bubble-left::after { content: ""; position: absolute; bottom: 0; left: -8px; width: 12px; height: 14px; background: inherit; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
@@ -35,39 +33,39 @@
 <body>
 <div id="app" class="max-w-md mx-auto p-4 min-h-screen">
     
-    <!-- 1. 顶部栏 -->
-    <div class="flex justify-between items-center mb-6 px-2">
+    <!-- 顶部栏 -->
+    <div class="flex justify-between items-center mb-6">
         <h1 style="font-family: 'ZCOOL KuaiLe';" class="text-3xl text-cyan-500">CardBox</h1>
-        <button @click="addCharacter" class="w-10 h-10 bg-cyan-500 text-white rounded-full text-2xl shadow-lg active:scale-90">+</button>
+        <button @click="addCharacter" class="w-10 h-10 bg-cyan-500 text-white rounded-full text-2xl shadow-lg">+</button>
     </div>
 
-    <!-- 2. 角色切换 -->
+    <!-- 角色导航 -->
     <div v-if="characters.length > 0" class="flex space-x-2 overflow-x-auto no-scrollbar mb-6 pb-2">
         <div v-for="(char, index) in characters" :key="char.id" 
              @click="activeIdx = index"
-             class="flex-shrink-0 px-5 py-2 rounded-2xl text-xs font-bold transition-all shadow-sm"
+             class="flex-shrink-0 px-5 py-2 rounded-2xl text-xs font-bold transition-all"
              :class="activeIdx === index ? 'bg-cyan-500 text-white' : 'bg-white text-gray-400'">
             {{ char.name || '未命名' }}
         </div>
     </div>
 
-    <!-- 3. 卡片主区 -->
+    <!-- 卡片主区 -->
     <div v-if="currentChar" id="capture-area" class="glass rounded-[3rem] p-6 relative overflow-visible flex flex-col">
         
-        <!-- A. 标签与头像 (防遮挡头像逻辑) -->
-        <div class="relative h-72 w-full mb-4">
+        <!-- A. 标签与头像 (绝对避让逻辑) -->
+        <div class="relative h-80 w-full mb-4" id="tag-zone">
             <div v-for="(tag, i) in currentChar.tags" :key="i"
                  class="stick-item px-3 py-1 rounded-full text-[10px] font-bold shadow-sm whitespace-nowrap"
-                 @touchstart="startTouch('tags', i)" @touchend="endTouch"
-                 :style="{ left: tag.x + '%', top: tag.y + '%', transform: 'rotate('+tag.r+'deg)', backgroundColor: tag.c, color: '#444' }">
+                 @touchstart="handlePress('tags', i)" @touchend="endTouch"
+                 :style="{ left: tag.x + '%', top: tag.y + '%', transform: 'rotate('+tag.r+'deg)', backgroundColor: tag.c, color: '#444', zIndex: tag.z }">
                 #{{ tag.text }}
             </div>
 
             <div class="absolute inset-0 flex items-center justify-center">
-                <div class="relative z-50">
+                <div class="relative z-[5000]"> <!-- 头像层级固定极高，防止被挡且不挡标签 -->
                     <div @click="triggerUpload" class="w-32 h-32 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-white flex items-center justify-center">
                         <img v-if="currentChar.avatar" :src="currentChar.avatar" class="w-full h-full object-cover">
-                        <span v-else class="text-gray-300 text-xs">上传头像</span>
+                        <span v-else class="text-gray-300 text-xs">头像</span>
                     </div>
                     <button @click="openInput('tags')" class="absolute bottom-1 right-1 w-8 h-8 bg-blue-400 text-white rounded-full border-2 border-white flex items-center justify-center shadow-md">+</button>
                 </div>
@@ -85,42 +83,40 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <div v-for="(s, i) in currentChar.settings" :key="i"
-                     @touchstart="startTouch('settings', i)" @touchend="endTouch"
-                     class="px-4 py-1.5 rounded-lg text-xs font-bold water-chip shadow-sm">
+                     @touchstart="handlePress('settings', i)" @touchend="endTouch"
+                     class="px-4 py-1.5 rounded-lg text-xs font-bold water-chip">
                     {{ s }}
                 </div>
             </div>
         </div>
 
-        <!-- C. 细节墙 (全随机贴纸 + 防遮挡 + 自动撑开高度) -->
+        <!-- C. 细节墙 (置顶交互版) -->
         <div class="mb-10 px-2">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-[10px] font-black text-yellow-500 tracking-widest uppercase">/ Details Wall 细节墙</h2>
                 <button @click="openInput('details')" class="w-6 h-6 bg-yellow-100 text-yellow-600 rounded-full">+</button>
             </div>
-            <div class="details-wall-container" :style="{ height: dynamicWallHeight + 'px' }">
+            <div class="relative w-full transition-all duration-300" :style="{ height: wallHeight + 'px' }">
                 <div v-for="(note, i) in currentChar.details" :key="i"
                      class="stick-item p-3 min-w-[100px] max-w-[150px] text-[11px] text-gray-700 shadow-md"
-                     @touchstart="startTouch('details', i)" @touchend="endTouch"
-                     :style="{ left: note.x + '%', top: note.y + 'px', transform: 'rotate('+note.r+'deg)', backgroundColor: note.c }">
-                    <div v-if="note.deco === 'tape'" class="absolute -top-2 left-1/2 -translate-x-1/2 w-10 h-3 bg-white/50 border border-black/5 rotate-2"></div>
+                     @touchstart="handlePress('details', i)" @touchend="endTouch"
+                     :style="{ left: note.x + '%', top: note.y + 'px', transform: 'rotate('+note.r+'deg)', backgroundColor: note.c, zIndex: note.z }">
+                    <div v-if="note.deco === 'tape'" class="absolute -top-2 left-1/2 -translate-x-1/2 w-10 h-3 bg-white/40 border border-black/5 rotate-2"></div>
                     <div v-else class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full" :style="{backgroundColor: note.pinC}"></div>
                     {{ note.text }}
                 </div>
             </div>
         </div>
 
-        <!-- D. 弹幕部分 (绿色渐变修复) -->
+        <!-- D. 弹幕部分 -->
         <div class="mb-10 px-2">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-[10px] font-black text-green-600 tracking-widest uppercase">/ Comments 弹幕</h2>
                 <button @click="openInput('bullets')" class="w-6 h-6 bg-green-100 text-green-600 rounded-full">+</button>
             </div>
             <div class="flex flex-col space-y-6">
-                <div v-for="(b, i) in currentChar.bullets" :key="i"
-                     :class="i % 2 === 0 ? 'self-start' : 'self-end'">
-                    <div class="bubble shadow-sm" 
-                         @touchstart="startTouch('bullets', i)" @touchend="endTouch"
+                <div v-for="(b, i) in currentChar.bullets" :key="i" :class="i % 2 === 0 ? 'self-start' : 'self-end'">
+                    <div class="bubble shadow-sm" @touchstart="handlePress('bullets', i)" @touchend="endTouch"
                          :class="i % 2 === 0 ? 'bubble-left' : 'bubble-right'"
                          :style="{ background: getGreenGradient(i) }">
                         {{ b }}
@@ -130,17 +126,17 @@
         </div>
     </div>
 
-    <!-- 底部按钮 -->
+    <!-- 导出/删除 -->
     <div v-if="currentChar" class="mt-8 grid grid-cols-2 gap-4 pb-20">
-        <button @click="exportImage" class="bg-gray-800 text-white py-4 rounded-3xl font-bold active:scale-95 transition-all">导出图片</button>
-        <button @click="delCharacter" class="bg-red-50 text-red-400 py-4 rounded-3xl font-bold active:scale-95 transition-all">删除角色</button>
+        <button @click="exportImage" class="bg-gray-800 text-white py-4 rounded-3xl font-bold shadow-lg">导出图片</button>
+        <button @click="delCharacter" class="bg-red-50 text-red-400 py-4 rounded-3xl font-bold border border-red-100">删除角色</button>
     </div>
 
-    <!-- 弹窗 -->
-    <div v-if="showModal" class="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center p-6 z-[200]">
-        <div class="bg-white rounded-[2rem] p-6 w-full max-w-sm">
-            <h3 class="font-bold mb-4 text-gray-800">添加{{ modalTitle }}</h3>
-            <textarea v-model="tempInput" class="w-full h-32 p-4 bg-gray-100 rounded-2xl outline-none mb-6"></textarea>
+    <!-- 输入弹窗 -->
+    <div v-if="showModal" class="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center p-6 z-[9999]">
+        <div class="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl">
+            <h3 class="font-bold mb-4 text-gray-800 text-lg">添加内容</h3>
+            <textarea v-model="tempInput" autofocus class="w-full h-32 p-4 bg-gray-100 rounded-2xl outline-none mb-6"></textarea>
             <div class="flex gap-4">
                 <button @click="showModal = false" class="flex-1 py-3 text-gray-400 font-bold">取消</button>
                 <button @click="confirmAdd" class="flex-1 py-3 bg-cyan-500 text-white rounded-2xl font-bold">确定</button>
@@ -154,58 +150,44 @@
 
     createApp({
         setup() {
-            const characters = ref(JSON.parse(localStorage.getItem('cards_v8')) || []);
+            const characters = ref(JSON.parse(localStorage.getItem('cards_v9')) || []);
             const activeIdx = ref(0);
             const showModal = ref(false);
             const tempInput = ref('');
             const targetType = ref('');
             const touchTimer = ref(null);
+            const maxZ = ref(100); // 全局层级计数器
 
             const currentChar = computed(() => characters.value[activeIdx.value] || null);
-            watch(characters, (v) => localStorage.setItem('cards_v8', JSON.stringify(v)), { deep: true });
+            watch(characters, (v) => localStorage.setItem('cards_v9', JSON.stringify(v)), { deep: true });
 
-            // 动态计算细节墙高度：根据最靠下的贴纸坐标 + 贴纸自身预估高度
-            const dynamicWallHeight = computed(() => {
+            // 动态墙高度计算
+            const wallHeight = computed(() => {
                 if (!currentChar.value || currentChar.value.details.length === 0) return 150;
-                const maxY = Math.max(...currentChar.value.details.map(d => d.y));
-                return maxY + 120; // 120px 是贴纸高度的余量
+                return Math.max(...currentChar.value.details.map(d => d.y)) + 120;
             });
 
-            const modalTitle = computed(() => {
-                const map = {tags:'标签', settings:'设定', details:'细节墙贴纸', bullets:'弹幕'};
-                return map[targetType.value];
-            });
-
-            // 智能位置分配：检测碰撞 + 避让头像
-            const getValidPos = (type, existing) => {
+            // 算法：生成避开头像的坐标
+            const getSafePos = (type, existing) => {
                 let x, y, r;
                 let attempts = 0;
-                
-                const isOverlapping = (nx, ny) => {
-                    return existing.some(item => {
-                        const dx = Math.abs(item.x - nx);
-                        const dy = type === 'details' ? Math.abs(item.y - ny) : Math.abs(item.y - ny);
-                        // 碰撞阈值：细节墙纵向比较敏感
-                        const thresholdX = type === 'details' ? 35 : 20;
-                        const thresholdY = type === 'details' ? 80 : 15;
-                        return dx < thresholdX && dy < thresholdY;
-                    });
+                const checkOverlap = (nx, ny) => {
+                    return existing.some(item => Math.abs(item.x - nx) < 15 && Math.abs(item.y - ny) < (type === 'tags' ? 10 : 60));
                 };
 
                 do {
                     if (type === 'tags') {
                         x = Math.random() * 80 + 5;
                         y = Math.random() * 80 + 5;
-                        // 避开头像圆心 (30% - 70%)
-                        if (x > 28 && x < 72 && y > 25 && y < 75) continue;
+                        // 头像避让禁区：28%-72% 范围禁止进入
+                        if (x > 25 && x < 75 && y > 20 && y < 80) continue;
                     } else {
                         x = Math.random() * 70 + 5;
-                        // 细节墙随数量往下自然增长，但带有高度随机性
-                        const row = Math.floor(existing.length / 2);
-                        y = (row * 90) + (Math.random() * 80);
+                        y = (existing.length * 50) + (Math.random() * 60);
                     }
                     attempts++;
-                } while (isOverlapping(x, y) && attempts < 50);
+                    if (!checkOverlap(x, y)) break;
+                } while (attempts < 100);
 
                 r = Math.random() * 20 - 10;
                 return { x, y, r };
@@ -238,12 +220,18 @@
                 const colors = ['#FFF9C4', '#F8BBD0', '#E1F5FE', '#E8F5E9', '#F3E5F5', '#FFF0E5'];
                 
                 if (type === 'settings') {
-                    currentChar.value.settings.push(tempInput.value);
+                    currentChar.value.settings.push(tempInput.value.trim());
                 } else if (type === 'bullets') {
-                    currentChar.value.bullets.push(tempInput.value);
+                    currentChar.value.bullets.push(tempInput.value.trim());
                 } else {
-                    const pos = getValidPos(type, currentChar.value[type]);
-                    const newItem = { text: tempInput.value, ...pos, c: colors[currentChar.value[type].length % colors.length] };
+                    const pos = getSafePos(type, currentChar.value[type]);
+                    maxZ.value++;
+                    const newItem = { 
+                        text: tempInput.value.trim(), 
+                        ...pos, 
+                        z: maxZ.value,
+                        c: colors[currentChar.value[type].length % colors.length] 
+                    };
                     if (type === 'details') {
                         newItem.deco = Math.random() > 0.5 ? 'tape' : 'pin';
                         newItem.pinC = ['#FF5E5E', '#5EAEFF', '#FFD15E'][Math.floor(Math.random()*3)];
@@ -253,37 +241,38 @@
                 showModal.value = false;
             };
 
-            const getGreenGradient = (i) => {
-                const shades = [
-                    'linear-gradient(135deg, #a8e063 0%, #56ab2f 100%)',
-                    'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-                    'linear-gradient(135deg, #C3E88D 0%, #7CB342 100%)',
-                    'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)'
-                ];
-                return shades[i % shades.length];
-            };
+            // 处理点击置顶及长按删除
+            const handlePress = (type, index) => {
+                // 点击置顶逻辑
+                if (type === 'tags' || type === 'details') {
+                    maxZ.value++;
+                    currentChar.value[type][index].z = maxZ.value;
+                }
 
-            const startTouch = (type, index) => {
+                // 长按删除逻辑
                 touchTimer.value = setTimeout(() => {
-                    if (confirm('确定要删除这条内容吗？')) currentChar.value[type].splice(index, 1);
+                    if (confirm('确认删除这条内容？')) {
+                        currentChar.value[type].splice(index, 1);
+                    }
                 }, 800);
             };
+
             const endTouch = () => clearTimeout(touchTimer.value);
+
+            const getGreenGradient = (i) => {
+                const shades = ['linear-gradient(135deg, #a8e063 0%, #56ab2f 100%)', 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', 'linear-gradient(135deg, #C3E88D 0%, #7CB342 100%)'];
+                return shades[i % shades.length];
+            };
 
             const exportImage = () => {
                 const area = document.getElementById('capture-area');
                 document.body.classList.add('exporting');
                 window.scrollTo(0,0);
                 setTimeout(() => {
-                    html2canvas(area, { 
-                        useCORS: true, 
-                        scale: 3, 
-                        backgroundColor: '#fdfdfd',
-                        scrollY: -window.scrollY
-                    }).then(canvas => {
+                    html2canvas(area, { useCORS: true, scale: 3, backgroundColor: '#f8fafc' }).then(canvas => {
                         const link = document.createElement('a');
-                        link.download = `${currentChar.value.name}_卡片.png`;
-                        link.href = canvas.toDataURL('image/png');
+                        link.download = `${currentChar.value.name}.png`;
+                        link.href = canvas.toDataURL();
                         link.click();
                         document.body.classList.remove('exporting');
                     });
@@ -291,16 +280,16 @@
             };
 
             const delCharacter = () => {
-                if (confirm('确定要彻底删除该角色吗？')) {
+                if (confirm('彻底删除角色？')) {
                     characters.value.splice(activeIdx.value, 1);
                     activeIdx.value = 0;
                 }
             };
 
             return {
-                characters, activeIdx, currentChar, showModal, tempInput, targetType, modalTitle, dynamicWallHeight,
+                characters, activeIdx, currentChar, showModal, tempInput, wallHeight,
                 addCharacter, triggerUpload, handleAvatar, openInput, confirmAdd, 
-                getGreenGradient, startTouch, endTouch, exportImage, delCharacter
+                handlePress, endTouch, getGreenGradient, exportImage, delCharacter
             }
         }
     }).mount('#app');
