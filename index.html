@@ -3,48 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色记录卡册 v15 - 稳定修复版</title>
+    <title>角色记录卡册 v17 - 终极稳定修复版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
         
-        body { background: #f0f4f8; font-family: sans-serif; margin: 0; padding: 0; min-height: 100vh; -webkit-tap-highlight-color: transparent; }
-        
+        body { background: #f0f4f8; font-family: sans-serif; min-height: 100vh; margin: 0; }
         [v-cloak] { display: none !important; }
 
-        .glass { 
-            background: rgba(255, 255, 255, 0.85); 
-            backdrop-filter: blur(12px); 
-            -webkit-backdrop-filter: blur(12px); 
-            border: 1px solid rgba(255, 255, 255, 0.4); 
-        }
+        .glass { background: #ffffff; border-radius: 3rem; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
 
-        /* 修复文字偏移：强制所有动态元素内部使用 flex 居中，并取消行间距干扰 */
+        /* 核心修复：文字换行与位置锁定 */
         .draggable-item { 
             position: absolute; touch-action: none; user-select: none;
-            display: flex; align-items: center; justify-content: center;
-            text-align: center; line-height: 1; padding: 6px 12px;
-            box-shadow: 2px 4px 10px rgba(0,0,0,0.08); 
-            white-space: nowrap;
+            display: block; text-align: center; word-break: break-all;
+            white-space: normal; line-height: 1.5; padding: 10px 14px;
+            box-shadow: 2px 4px 12px rgba(0,0,0,0.1); z-index: 10;
         }
 
-        .bubble { 
-            position: relative; padding: 12px 18px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; 
-            display: inline-flex; align-items: center; justify-content: center; line-height: 1;
-        }
-
-        /* 导出时的极端兼容模式 */
-        .exporting .glass { backdrop-filter: none !important; background: #ffffff !important; border: 2px solid #f0f0f0 !important; }
-        .exporting .draggable-item { box-shadow: none !important; border: 1px solid rgba(0,0,0,0.05) !important; }
+        .tag-item { max-width: 110px; font-size: 11px; border-radius: 999px; font-weight: bold; }
         
+        .note-item { 
+            max-width: 180px; min-width: 90px; min-height: 50px; 
+            font-size: 12px; border-radius: 2px;
+        }
+
+        /* 弹幕气泡修复 */
+        .bubble { 
+            position: relative; display: block; max-width: 260px;
+            word-break: break-all; padding: 12px 18px; border-radius: 20px; 
+            font-size: 12px; font-weight: bold; color: white; line-height: 1.4;
+        }
+
+        /* 装饰物：绝对定位，不撑开容器，不挤压文字 */
+        .deco-tape {
+            position: absolute; top: -8px; left: 50%; transform: translateX(-50%) rotate(2deg);
+            width: 40px; height: 14px; background: rgba(255,255,255,0.5);
+            border: 1px solid rgba(0,0,0,0.05); pointer-events: none;
+        }
+        .deco-pin {
+            position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+            width: 10px; height: 10px; border-radius: 50%; pointer-events: none;
+        }
+
         .bubble-left { border-bottom-left-radius: 2px; }
         .bubble-left::after { content: ""; position: absolute; bottom: 0; left: -8px; width: 12px; height: 14px; background: inherit; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
         .bubble-right { border-bottom-right-radius: 2px; }
         .bubble-right::after { content: ""; position: absolute; bottom: 0; right: -8px; width: 12px; height: 14px; background: inherit; clip-path: polygon(0 0, 0 100%, 100% 100%); }
-        
-        .water-chip { background: #CCF2F4; color: #008D96; border: 1px solid #A7E4E9; }
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
@@ -52,31 +60,31 @@
 
 <div id="app" v-cloak class="max-w-md mx-auto p-4 pb-24">
     
-    <!-- 顶部 -->
+    <!-- 1. 顶部标题 -->
     <div class="flex justify-between items-center mb-6">
         <h1 style="font-family: 'ZCOOL KuaiLe';" class="text-3xl text-cyan-500">CardBox</h1>
-        <button @click="addCharacter" class="w-10 h-10 bg-cyan-500 text-white rounded-full text-2xl shadow-lg active:scale-90 transition-transform">+</button>
+        <button @click="addCharacter" class="w-10 h-10 bg-cyan-500 text-white rounded-full text-2xl shadow-lg active:scale-90">+</button>
     </div>
 
-    <!-- 存档工具栏 -->
+    <!-- 2. 档案管理 -->
     <div class="bg-white rounded-3xl p-4 mb-6 shadow-sm border border-gray-100 text-[11px]">
-        <div class="flex justify-between text-gray-400 font-bold mb-3 px-1 uppercase tracking-tighter">
+        <div class="flex justify-between text-gray-400 font-bold mb-3 px-1 uppercase">
             <span>Archive / 存档管理</span>
-            <span @click="clearAllData" class="text-red-300">清空重置</span>
+            <span @click="clearAllData" class="text-red-300 cursor-pointer">清空重置</span>
         </div>
         <div class="grid grid-cols-2 gap-2 mb-2">
-            <button @click="exportSingle" class="py-2 bg-cyan-50 text-cyan-600 rounded-xl font-bold active:bg-cyan-100">导出单人存档</button>
-            <button @click="$refs.importOne.click()" class="py-2 bg-blue-50 text-blue-600 rounded-xl font-bold active:bg-blue-100">追加单人导入</button>
+            <button @click="exportSingle" class="py-2 bg-cyan-50 text-cyan-600 rounded-xl font-bold">导出单人存档</button>
+            <button @click="$refs.importOne.click()" class="py-2 bg-blue-50 text-blue-600 rounded-xl font-bold">追加单人导入</button>
         </div>
         <div class="grid grid-cols-2 gap-2 border-t border-gray-50 pt-2">
-            <button @click="exportAll" class="py-2 bg-gray-800 text-white rounded-xl font-bold active:opacity-80">导出全员备份</button>
+            <button @click="exportAll" class="py-2 bg-gray-800 text-white rounded-xl font-bold">导出全员备份</button>
             <button @click="$refs.importAll.click()" class="py-2 bg-white border border-gray-200 text-gray-600 rounded-xl font-bold">恢复全员备份</button>
         </div>
         <input type="file" ref="importOne" class="hidden" accept=".json" @change="importSingle">
         <input type="file" ref="importAll" class="hidden" accept=".json" @change="importAll">
     </div>
 
-    <!-- 角色导航 -->
+    <!-- 3. 角色导航 -->
     <div v-if="characters.length > 0" class="flex space-x-2 overflow-x-auto no-scrollbar mb-6 py-1">
         <div v-for="(char, index) in characters" :key="char.id" 
              @click="activeIdx = index"
@@ -86,14 +94,13 @@
         </div>
     </div>
 
-    <!-- 卡片区域 -->
-    <div v-if="currentChar" :key="currentChar.id" id="capture-area" class="glass rounded-[3rem] p-6 relative overflow-visible flex flex-col">
+    <!-- 4. 主卡片区 -->
+    <div v-if="currentChar" :key="currentChar.id" id="capture-area" class="glass p-6 relative overflow-visible flex flex-col bg-white">
         
-        <!-- 头像与标签区 -->
+        <!-- A. 头像与标签 -->
         <div class="relative h-80 w-full mb-4" id="tag-zone">
-            <!-- 标签 -->
             <div v-for="(tag, i) in currentChar.tags" :key="i"
-                 class="draggable-item rounded-full text-[10px] font-bold"
+                 class="draggable-item tag-item"
                  @touchstart="startDrag($event, tag, 'tags', i)"
                  :style="{ left: tag.x + 'px', top: tag.y + 'px', transform: 'rotate('+tag.r+'deg)', backgroundColor: tag.c, color: '#444', zIndex: tag.z }">
                 #{{ tag.text }}
@@ -103,7 +110,7 @@
                 <div class="relative pointer-events-auto" style="z-index: 1000;">
                     <div @click="triggerUpload" class="w-32 h-32 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-white flex items-center justify-center">
                         <img v-if="currentChar.avatar" :src="currentChar.avatar" class="w-full h-full object-cover">
-                        <span v-else class="text-gray-300 text-xs">上传头像</span>
+                        <span v-else class="text-gray-300 text-[10px]">点击上传</span>
                     </div>
                     <button @click.stop="openInput('tags')" class="absolute bottom-1 right-1 w-9 h-9 bg-blue-500 text-white rounded-full border-2 border-white flex items-center justify-center shadow-xl font-bold">+</button>
                 </div>
@@ -111,9 +118,9 @@
             <input type="file" id="avatar-input" class="hidden" accept="image/*" @change="handleAvatar">
         </div>
 
-        <input type="text" v-model="currentChar.name" class="w-full text-center bg-transparent text-2xl font-black text-gray-800 outline-none mb-6 border-b border-dashed border-gray-100 focus:border-cyan-200">
+        <input type="text" v-model="currentChar.name" class="w-full text-center bg-transparent text-2xl font-black text-gray-800 outline-none mb-8">
 
-        <!-- 设定区 -->
+        <!-- B. 设定区 -->
         <div class="mb-10 px-2">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-[10px] font-black text-cyan-600 tracking-widest uppercase">/ Settings 设定</h2>
@@ -124,25 +131,25 @@
             </div>
         </div>
 
-        <!-- 细节墙 -->
+        <!-- C. 细节墙 -->
         <div class="mb-10 px-2">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-[10px] font-black text-yellow-500 tracking-widest uppercase">/ Details Wall 细节墙</h2>
                 <button @click="openInput('details')" class="w-6 h-6 bg-yellow-100 text-yellow-600 rounded-full">+</button>
             </div>
-            <div class="relative w-full border-2 border-dashed border-gray-100 rounded-3xl min-h-[250px]" :style="{ height: wallHeight + 'px' }">
+            <div class="relative w-full border-2 border-dashed border-gray-100 rounded-3xl min-h-[300px] bg-gray-50/20" :style="{ height: wallHeight + 'px' }">
                 <div v-for="(note, i) in currentChar.details" :key="i"
-                     class="draggable-item p-3 min-w-[100px] max-w-[150px] text-[11px] text-gray-700 rounded-sm"
+                     class="draggable-item note-item"
                      @touchstart="startDrag($event, note, 'details', i)"
                      :style="{ left: note.x + 'px', top: note.y + 'px', transform: 'rotate('+note.r+'deg)', backgroundColor: note.c, zIndex: note.z }">
-                    <div v-if="note.deco === 'tape'" class="absolute -top-2 left-1/2 -translate-x-1/2 w-10 h-3 bg-white/40 border border-black/5 rotate-2"></div>
-                    <div v-else class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full" :style="{backgroundColor: note.pinC}"></div>
+                    <div v-if="note.deco === 'tape'" class="deco-tape"></div>
+                    <div v-else class="deco-pin" :style="{backgroundColor: note.pinC}"></div>
                     {{ note.text }}
                 </div>
             </div>
         </div>
 
-        <!-- 弹幕区 -->
+        <!-- D. 弹幕部分 -->
         <div class="mb-10 px-2">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-[10px] font-black text-green-600 tracking-widest uppercase">/ Comments 弹幕</h2>
@@ -150,7 +157,11 @@
             </div>
             <div class="flex flex-col space-y-6">
                 <div v-for="(b, i) in currentChar.bullets" :key="i" :class="i % 2 === 0 ? 'self-start' : 'self-end'">
-                    <div class="bubble shadow-sm" @touchstart="handleLongPress('bullets', i)" :style="{ background: getGreenGradient(i) }">{{ b }}</div>
+                    <div class="bubble shadow-sm" @touchstart="handleLongPress('bullets', i)" 
+                         :class="i % 2 === 0 ? 'bubble-left' : 'bubble-right'"
+                         :style="{ background: getGreenGradient(i) }">
+                        {{ b }}
+                    </div>
                 </div>
             </div>
         </div>
@@ -158,17 +169,17 @@
 
     <!-- 底部操作 -->
     <div v-if="currentChar" class="mt-8 grid grid-cols-2 gap-4 pb-12 px-2">
-        <button @click="exportImage" class="bg-gray-800 text-white py-4 rounded-3xl font-bold shadow-lg active:opacity-90">导出图片</button>
+        <button @click="exportImage" class="bg-gray-800 text-white py-4 rounded-3xl font-bold shadow-lg">保存为图片</button>
         <button @click="delCharacter" class="bg-red-50 text-red-400 py-4 rounded-3xl font-bold border border-red-100">删除角色</button>
     </div>
 
-    <!-- 输入弹窗 -->
+    <!-- 输入窗 -->
     <div v-if="showModal" class="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-6 z-[9999]">
-        <div class="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl">
+        <div class="bg-white rounded-[2rem] p-6 w-full max-w-sm">
             <textarea v-model="tempInput" placeholder="输入内容..." class="w-full h-32 p-4 bg-gray-50 rounded-2xl outline-none mb-6"></textarea>
             <div class="flex gap-4">
                 <button @click="showModal = false" class="flex-1 py-3 text-gray-400 font-bold">取消</button>
-                <button @click="confirmAdd" class="flex-1 py-3 bg-cyan-500 text-white rounded-2xl font-bold">确定</button>
+                <button @click="confirmAdd" class="flex-1 py-3 bg-cyan-500 text-white rounded-2xl font-bold">确认添加</button>
             </div>
         </div>
     </div>
@@ -179,42 +190,36 @@ const { createApp, ref, computed, watch, onMounted } = Vue;
 
 createApp({
     setup() {
-        const STORAGE_KEY = 'cards_v15_stable';
+        const STORAGE_KEY = 'cards_v17_final';
         
-        // 初始数据加载
-        const loadInitialData = () => {
+        // 容错读取数据
+        const safeLoad = () => {
             try {
-                const data = localStorage.getItem(STORAGE_KEY);
-                return data ? JSON.parse(data) : [];
+                const res = localStorage.getItem(STORAGE_KEY);
+                return res ? JSON.parse(res) : [];
             } catch (e) {
-                console.error("Data load error", e);
                 return [];
             }
         };
 
-        const characters = ref(loadInitialData());
+        const characters = ref(safeLoad());
         const activeIdx = ref(0);
         const showModal = ref(false);
         const tempInput = ref('');
         const targetType = ref('');
-        const maxZ = ref(2000);
+        const maxZ = ref(5000);
         const touchTimer = ref(null);
 
         const currentChar = computed(() => {
             if (characters.value.length === 0) return null;
             return characters.value[activeIdx.value] || characters.value[0];
         });
-
-        // 数据保存
+        
         watch(characters, (v) => {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
-            } catch (e) {
-                alert("存储空间已满！请导出部分单人存档并删除，以腾出空间。");
-            }
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(v)); } 
+            catch (e) { alert("存储空间已满，请导出存档并清空。"); }
         }, { deep: true });
 
-        // 核心功能：头像上传与清晰度修正
         const handleAvatar = (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -225,47 +230,31 @@ createApp({
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    const targetSize = 400; // 保持清晰度
-                    canvas.width = targetSize;
-                    canvas.height = targetSize;
-                    
+                    canvas.width = 400; canvas.height = 400;
                     const aspect = img.width / img.height;
                     let sx, sy, sw, sh;
-                    if (aspect > 1) { 
-                        sw = img.height; sh = img.height;
-                        sx = (img.width - sw) / 2; sy = 0;
-                    } else { 
-                        sw = img.width; sh = img.width;
-                        sx = 0; sy = (img.height - sh) / 2;
-                    }
-                    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetSize, targetSize);
-                    currentChar.value.avatar = canvas.toDataURL('image/jpeg', 0.8);
+                    if (aspect > 1) { sw = img.height; sh = img.height; sx = (img.width - sw) / 2; sy = 0; }
+                    else { sw = img.width; sh = img.width; sx = 0; sy = (img.height - sh) / 2; }
+                    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, 400, 400);
+                    currentChar.value.avatar = canvas.toDataURL('image/jpeg', 0.85);
                 };
             };
             reader.readAsDataURL(file);
         };
 
-        const triggerUpload = () => {
-            const input = document.getElementById('avatar-input');
-            if(input) input.click();
-        };
-
-        // 添加内容逻辑
         const confirmAdd = () => {
             const val = tempInput.value.trim();
+            const type = targetType.value; // 修复了这里的变量定义！
             if (!val) { showModal.value = false; return; }
             
-            const type = targetType.value;
             if (type === 'settings' || type === 'bullets') {
                 currentChar.value[type].push(val);
             } else {
                 maxZ.value++;
                 const newItem = {
                     text: val,
-                    x: 20 + Math.random() * 30,
-                    y: 20 + Math.random() * 30,
-                    r: Math.random() * 10 - 5,
-                    z: maxZ.value,
+                    x: 20 + Math.random() * 20, y: 20 + Math.random() * 20,
+                    r: Math.random() * 12 - 6, z: maxZ.value,
                     c: ['#FFF9C4', '#F8BBD0', '#E1F5FE', '#E8F5E9', '#F3E5F5'][Math.floor(Math.random() * 5)]
                 };
                 if (type === 'details') {
@@ -278,26 +267,17 @@ createApp({
             tempInput.value = '';
         };
 
-        // 拖拽逻辑
         const startDrag = (e, item, type, index) => {
             const touch = e.touches[0];
             const startX = touch.clientX - item.x;
             const startY = touch.clientY - item.y;
-            maxZ.value++;
-            item.z = maxZ.value;
-
-            touchTimer.value = setTimeout(() => {
-                if(confirm('删除此内容？')) {
-                    currentChar.value[type].splice(index, 1);
-                }
-            }, 800);
-
+            maxZ.value++; item.z = maxZ.value;
+            touchTimer.value = setTimeout(() => { if(confirm('确认删除此项？')) currentChar.value[type].splice(index, 1); }, 800);
             const moveDrag = (ev) => {
                 clearTimeout(touchTimer.value);
                 item.x = ev.touches[0].clientX - startX;
                 item.y = ev.touches[0].clientY - startY;
             };
-
             const stopDrag = () => {
                 clearTimeout(touchTimer.value);
                 document.removeEventListener('touchmove', moveDrag);
@@ -307,86 +287,69 @@ createApp({
             document.addEventListener('touchend', stopDrag);
         };
 
-        // 导出功能
-        const exportSingle = () => {
-            const blob = new Blob([JSON.stringify(currentChar.value)], { type: 'application/json' });
-            saveFile(blob, `角色_${currentChar.value.name}.json`);
-        };
-
-        const exportAll = () => {
-            const blob = new Blob([JSON.stringify(characters.value)], { type: 'application/json' });
-            saveFile(blob, `全员备份_${new Date().toLocaleDateString()}.json`);
-        };
-
-        const saveFile = (blob, name) => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = name; a.click();
-            URL.revokeObjectURL(url);
-        };
-
-        const importSingle = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    const item = JSON.parse(ev.target.result);
-                    item.id = Date.now();
-                    characters.value.push(item);
-                    activeIdx.value = characters.value.length - 1;
-                } catch (err) { alert("导入格式错误"); }
-            };
-            reader.readAsText(file);
-            e.target.value = '';
-        };
-
-        const importAll = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    const list = JSON.parse(ev.target.result);
-                    if (Array.isArray(list)) {
-                        characters.value = list;
-                        activeIdx.value = 0;
-                    }
-                } catch (err) { alert("导入失败"); }
-            };
-            reader.readAsText(file);
-            e.target.value = '';
-        };
-
         const exportImage = () => {
             const area = document.getElementById('capture-area');
-            document.body.classList.add('exporting');
-            setTimeout(() => {
-                html2canvas(area, { useCORS: true, scale: 2, backgroundColor: '#f0f4f8' }).then(canvas => {
-                    const link = document.createElement('a');
-                    link.download = `${currentChar.value.name}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                    document.body.classList.remove('exporting');
-                });
-            }, 500);
+            window.scrollTo(0,0);
+            html2canvas(area, { 
+                useCORS: true, 
+                scale: 2, 
+                backgroundColor: '#f0f4f8'
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `${currentChar.value.name || '角色卡'}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
         };
 
         return {
-            characters, activeIdx, currentChar, showModal, tempInput, targetType,
+            characters, activeIdx, currentChar, showModal, tempInput,
             wallHeight: computed(() => {
-                if (!currentChar.value?.details?.length) return 250;
-                return Math.max(250, Math.max(...currentChar.value.details.map(d => d.y)) + 150);
+                if (!currentChar.value?.details?.length) return 300;
+                const maxY = Math.max(...currentChar.value.details.map(d => d.y));
+                return Math.max(300, maxY + 180);
             }),
             addCharacter: () => {
                 characters.value.push({ id: Date.now(), name: '新角色', avatar: '', tags: [], settings: [], details: [], bullets: [] });
                 activeIdx.value = characters.value.length - 1;
             },
-            triggerUpload, handleAvatar, openInput: (type) => { targetType.value = type; tempInput.value = ''; showModal.value = true; },
-            confirmAdd, startDrag, exportImage, exportSingle, exportAll, importSingle, importAll,
-            delCharacter: () => { if(confirm('删除？')) { characters.value.splice(activeIdx.value, 1); activeIdx.value = 0; } },
+            triggerUpload: () => document.getElementById('avatar-input').click(),
+            handleAvatar, openInput: (t) => { targetType.value = t; tempInput.value = ''; showModal.value = true; },
+            confirmAdd, startDrag, exportImage,
+            exportSingle: () => {
+                const blob = new Blob([JSON.stringify(currentChar.value)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `角色_${currentChar.value.name}.json`;
+                a.click();
+            },
+            importSingle: (e) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const item = JSON.parse(ev.target.result);
+                    item.id = Date.now();
+                    characters.value.push(item);
+                    activeIdx.value = characters.value.length - 1;
+                };
+                reader.readAsText(e.target.files[0]);
+                e.target.value = '';
+            },
+            exportAll: () => {
+                const blob = new Blob([JSON.stringify(characters.value)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `全员备份.json`;
+                a.click();
+            },
+            importAll: (e) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => { characters.value = JSON.parse(ev.target.result); activeIdx.value = 0; };
+                reader.readAsText(e.target.files[0]);
+                e.target.value = '';
+            },
+            delCharacter: () => { if(confirm('彻底删除？')) { characters.value.splice(activeIdx.value, 1); activeIdx.value = 0; } },
             clearAllData: () => { if(confirm('清空所有？')) { localStorage.clear(); location.reload(); } },
-            getGreenGradient: (i) => ['linear-gradient(135deg, #a8e063 0%, #56ab2f 100%)', 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', 'linear-gradient(135deg, #7CB342 100%)'][i % 3],
+            getGreenGradient: (i) => ['#a8e063', '#11998e', '#7CB342'][i % 3],
             handleLongPress: (type, index) => {
                 touchTimer.value = setTimeout(() => { if(confirm('删除此项？')) currentChar.value[type].splice(index, 1); }, 800);
             }
