@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色记录卡册 Pro</title>
+    <title>幻色角色卡册 Pro Max</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -11,197 +11,212 @@
         @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
 
         body {
-            background: #f0f2f5;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            margin: 0;
-            padding-bottom: 50px;
+            background: #fdfcfb;
+            font-family: -apple-system, sans-serif;
+            overflow-x: hidden;
         }
 
-        /* 毛玻璃基础 */
+        /* 毛玻璃与导出适配 */
         .glass {
-            background: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.6);
             backdrop-filter: blur(15px);
             -webkit-backdrop-filter: blur(15px);
             border: 1px solid rgba(255, 255, 255, 0.4);
         }
+        .exporting .glass {
+            backdrop-filter: none !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+        }
 
-        /* 标签漂浮动画 */
-        .float-tag {
+        /* 标签样式 */
+        .tag-item {
             position: absolute;
+            transition: all 0.3s ease;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 4px;
+            box-shadow: 1px 2px 5px rgba(0,0,0,0.05);
             z-index: 20;
-            transition: all 0.5s ease;
-            animation: floating 3s ease-in-out infinite alternate;
-        }
-        @keyframes floating {
-            from { transform: translate(0, 0) rotate(var(--r)); }
-            to { transform: translate(4px, 8px) rotate(var(--r)); }
         }
 
-        /* 随机便签墙 */
-        .note-wall {
+        /* 便签细节墙样式 */
+        .note-container {
+            position: relative;
             display: flex;
             flex-wrap: wrap;
-            align-items: flex-start;
-            gap: 10px;
-            padding: 10px;
-        }
-        .random-note {
-            box-shadow: 3px 3px 10px rgba(0,0,0,0.05);
-            max-width: 85%;
-            word-break: break-all;
-            line-height: 1.4;
+            gap: 15px;
+            padding: 20px 10px;
         }
 
-        /* 导出时的强制修正 */
-        .export-mode .glass {
-            backdrop-filter: none !important;
-            background: #ffffff !important;
+        .note-card {
+            position: relative;
+            min-width: 80px;
+            max-width: 140px;
+            padding: 12px 8px 8px 8px;
+            font-size: 11px;
+            color: #444;
+            box-shadow: 2px 3px 10px rgba(0,0,0,0.08);
         }
-        .export-mode .random-note {
-            box-shadow: none !important;
-            border: 1px solid rgba(0,0,0,0.05);
+
+        /* 胶带效果 */
+        .tape {
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%) rotate(-2deg);
+            width: 40px;
+            height: 14px;
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(2px);
+            border: 1px solid rgba(255,255,255,0.3);
+            z-index: 5;
+        }
+
+        /* 图钉效果 */
+        .pin {
+            position: absolute;
+            top: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff5e5e;
+            box-shadow: 0 2px 2px rgba(0,0,0,0.2);
+            z-index: 5;
         }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
-<div id="app" class="max-w-md mx-auto min-h-screen flex flex-col p-4">
+<div id="app" class="max-w-md mx-auto p-4 min-h-screen">
     
-    <!-- 1. 顶部状态栏 -->
-    <div class="flex justify-between items-center mb-6 px-2">
-        <h1 style="font-family: 'ZCOOL KuaiLe';" class="text-3xl text-indigo-400">CardBox</h1>
-        <button @click="addCharacter" class="w-10 h-10 bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all">
-            <span class="text-2xl">+</span>
-        </button>
+    <!-- 顶部 -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 style="font-family: 'ZCOOL KuaiLe';" class="text-3xl text-pink-400">CardBox</h1>
+        <button @click="addCharacter" class="w-10 h-10 bg-white shadow-md rounded-full text-pink-400 text-2xl font-bold">+</button>
     </div>
 
-    <!-- 2. 空状态提示 -->
-    <div v-if="characters.length === 0" class="flex-1 flex flex-col items-center justify-center text-gray-400 space-y-4 mt-20">
-        <div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-4xl">🗂️</div>
-        <p>还没有角色，点击右上角开始创建</p >
-    </div>
-
-    <!-- 3. 角色选择横条 -->
-    <div v-if="characters.length > 0" class="flex space-x-2 overflow-x-auto no-scrollbar mb-6 pb-2">
+    <!-- 角色列表 -->
+    <div v-if="characters.length > 0" class="flex space-x-2 overflow-x-auto no-scrollbar mb-6">
         <div v-for="(char, index) in characters" :key="char.id" 
              @click="activeIdx = index"
-             class="flex-shrink-0 px-5 py-2 rounded-2xl text-sm font-bold transition-all shadow-sm"
-             :class="activeIdx === index ? 'bg-indigo-500 text-white scale-105' : 'bg-white text-gray-400'">
+             class="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all"
+             :class="activeIdx === index ? 'bg-pink-400 text-white' : 'bg-white text-gray-400'">
             {{ char.name || '未命名' }}
         </div>
     </div>
 
-    <!-- 4. 主卡片区 -->
-    <div v-if="currentChar" id="capture-area" class="glass rounded-[2.5rem] p-6 relative overflow-visible flex flex-col">
+    <!-- 主卡片 -->
+    <div v-if="currentChar" id="capture-area" class="glass rounded-[3rem] p-6 relative overflow-hidden flex flex-col min-h-[800px]">
         
-        <!-- 头像区域 (高度固定，允许溢出) -->
-        <div class="relative h-64 w-full flex items-center justify-center mb-6" style="z-index: 10;">
-            <!-- 环绕标签 -->
+        <!-- 装饰背景 -->
+        <div class="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
+        <div class="absolute bottom-0 left-0 w-32 h-32 bg-yellow-100 rounded-full blur-3xl opacity-50"></div>
+
+        <!-- 头像与标签随机区 -->
+        <div class="relative h-72 w-full mb-4" id="avatar-zone">
+            <!-- 随机标签 -->
             <div v-for="(tag, i) in currentChar.tags" :key="i"
-                 class="float-tag px-3 py-1 rounded-full text-xs font-bold shadow-sm whitespace-nowrap"
+                 class="tag-item"
                  @touchstart="startTouch('tags', i)" @touchend="endTouch"
-                 :style="getTagStyle(i)">
-                # {{ tag }}
+                 :style="getRandTagStyle(i)">
+                #{{ tag }}
             </div>
 
             <!-- 头像中心 -->
-            <div class="relative">
-                <div @click="triggerUpload" class="w-32 h-32 rounded-full border-4 border-white shadow-xl overflow-hidden bg-white flex items-center justify-center z-30 relative">
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <div @click="triggerUpload" class="w-36 h-36 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-gray-50 pointer-events-auto flex items-center justify-center">
                     < img v-if="currentChar.avatar" :src="currentChar.avatar" class="w-full h-full object-cover">
-                    <span v-else class="text-gray-300 text-xs">上传图片</span>
+                    <div v-else class="text-[10px] text-gray-300">点击上传头像</div>
                 </div>
-                <!-- 添加标签的按钮 -->
-                <button @click="openModal('tags')" class="absolute bottom-0 right-0 w-8 h-8 bg-blue-400 text-white rounded-full border-2 border-white z-40 flex items-center justify-center shadow-md">
-                    +
-                </button>
+                <input type="file" id="avatar-input" class="hidden" accept="image/*" @change="handleAvatar">
+                <button @click="addItem('tags')" class="mt-4 px-3 py-1 bg-white/80 rounded-full text-[10px] font-bold text-gray-500 shadow-sm pointer-events-auto">+ 添加标签</button>
             </div>
-            <input type="file" id="avatar-input" class="hidden" accept="image/*" @change="handleAvatar">
         </div>
 
         <!-- 角色名 -->
-        <div class="text-center mb-8">
-            <input type="text" v-model="currentChar.name" placeholder="输入角色名" 
-                   class="bg-white/50 px-6 py-2 rounded-2xl text-xl font-black text-gray-700 outline-none text-center w-full max-w-[200px]">
-        </div>
+        <input type="text" v-model="currentChar.name" placeholder="角色名称" 
+               class="text-center w-full bg-transparent text-2xl font-black text-gray-800 outline-none mb-8">
 
-        <!-- 板块：设定 (流式布局) -->
-        <div class="mb-8">
-            <div class="flex justify-between items-center mb-3 px-2">
-                <span class="text-xs font-black text-pink-400 tracking-tighter uppercase">/ Settings 设定</span>
-                <button @click="openModal('settings')" class="text-pink-400 font-bold">+</button>
+        <!-- 设定板块 -->
+        <div class="mb-8 px-2">
+            <div class="flex justify-between items-end mb-4">
+                <h2 class="text-[10px] font-black text-blue-400 tracking-widest uppercase">/ Settings</h2>
+                <button @click="addItem('settings')" class="text-blue-400 text-lg">+</button>
             </div>
             <div class="flex flex-wrap gap-2">
                 <div v-for="(s, i) in currentChar.settings" :key="i"
                      @touchstart="startTouch('settings', i)" @touchend="endTouch"
-                     class="px-4 py-1 bg-pink-100/60 text-pink-600 rounded-lg text-xs font-bold border border-pink-200">
+                     class="px-3 py-1 bg-blue-50 text-blue-500 rounded border border-blue-100 text-[10px] font-medium rotate-1">
                     {{ s }}
                 </div>
             </div>
         </div>
 
-        <!-- 板块：细节 (核心：随机便签墙) -->
-        <div class="mb-8">
-            <div class="flex justify-between items-center mb-3 px-2">
-                <span class="text-xs font-black text-yellow-500 tracking-tighter uppercase">/ Details 细节墙</span>
-                <button @click="openModal('details')" class="text-yellow-500 font-bold">+</button>
+        <!-- 细节便签墙 (随机混乱风) -->
+        <div class="mb-8 px-2">
+            <div class="flex justify-between items-end mb-2">
+                <h2 class="text-[10px] font-black text-yellow-500 tracking-widest uppercase">/ Details Wall</h2>
+                <button @click="addItem('details')" class="text-yellow-500 text-lg">+</button>
             </div>
-            <div class="note-wall">
+            <div class="note-container">
                 <div v-for="(d, i) in currentChar.details" :key="i"
                      @touchstart="startTouch('details', i)" @touchend="endTouch"
-                     class="random-note p-3 rounded-md text-sm text-gray-700 font-medium"
+                     class="note-card"
                      :style="getNoteStyle(i)">
+                    <!-- 随机显示装饰：胶带或图钉 -->
+                    <div v-if="i % 2 === 0" class="tape"></div>
+                    <div v-else class="pin" :style="{backgroundColor: getPinColor(i)}"></div>
                     {{ d }}
                 </div>
             </div>
         </div>
 
-        <!-- 板块：弹幕 -->
-        <div class="mb-10">
-            <div class="flex justify-between items-center mb-3 px-2">
-                <span class="text-xs font-black text-green-500 tracking-tighter uppercase">/ Bullets 吐槽</span>
-                <button @click="openModal('bullets')" class="text-green-500 font-bold">+</button>
+        <!-- 弹幕板块 (多色循环) -->
+        <div class="mb-10 px-2">
+            <div class="flex justify-between items-end mb-4">
+                <h2 class="text-[10px] font-black text-purple-400 tracking-widest uppercase">/ Bullets</h2>
+                <button @click="addItem('bullets')" class="text-purple-400 text-lg">+</button>
             </div>
-            <div class="space-y-2">
+            <div class="flex flex-wrap gap-2">
                 <div v-for="(b, i) in currentChar.bullets" :key="i"
                      @touchstart="startTouch('bullets', i)" @touchend="endTouch"
-                     class="inline-block bg-green-400 text-white px-4 py-1.5 rounded-full rounded-bl-none text-xs mr-2 mb-1">
+                     class="px-4 py-2 rounded-full text-white text-[10px] shadow-sm font-bold"
+                     :style="{ backgroundColor: getBulletColor(i) }">
                     {{ b }}
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 底部操作 -->
-    <div v-if="currentChar" class="mt-6 grid grid-cols-2 gap-4 pb-10">
-        <button @click="exportImage" class="bg-indigo-500 text-white py-4 rounded-3xl font-bold shadow-lg">
-            导出卡片图片
-        </button>
-        <button @click="delCharacter" class="bg-red-50 text-red-400 py-4 rounded-3xl font-bold border border-red-100">
-            删除此角色
-        </button>
+    <!-- 操作 -->
+    <div v-if="currentChar" class="mt-8 grid grid-cols-2 gap-4 pb-20">
+        <button @click="exportImage" class="bg-gray-800 text-white py-4 rounded-3xl font-bold">导出卡片</button>
+        <button @click="delChar" class="bg-red-50 text-red-400 py-4 rounded-3xl font-bold">删除角色</button>
     </div>
 
-    <!-- 全局输入弹窗 -->
-    <div v-if="showModal" class="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center p-6 z-[100]">
-        <div class="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl">
-            <h3 class="font-bold text-gray-800 mb-4">添加内容</h3>
-            <textarea v-model="tempInput" autofocus class="w-full h-32 p-4 bg-gray-50 rounded-2xl outline-none mb-6 text-gray-700"></textarea>
+    <!-- 输入对话框 -->
+    <div v-if="showModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 z-[100]">
+        <div class="bg-white rounded-[2rem] p-6 w-full max-w-sm">
+            <h3 class="font-bold mb-4">添加内容</h3>
+            <textarea v-model="tempInput" class="w-full h-32 p-4 bg-gray-50 rounded-2xl outline-none mb-6"></textarea>
             <div class="flex gap-4">
                 <button @click="showModal = false" class="flex-1 py-3 text-gray-400">取消</button>
-                <button @click="confirmAdd" class="flex-1 py-3 bg-indigo-500 text-white rounded-2xl font-bold">确认</button>
+                <button @click="confirmAdd" class="flex-1 py-3 bg-pink-400 text-white rounded-2xl font-bold shadow-lg">确认</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    const { createApp, ref, computed, watch, nextTick } = Vue;
+    const { createApp, ref, computed, watch } = Vue;
 
     createApp({
         setup() {
-            // 初始化数据为空数组
-            const characters = ref(JSON.parse(localStorage.getItem('chars_v3')) || []);
+            const characters = ref(JSON.parse(localStorage.getItem('cards_v4')) || []);
             const activeIdx = ref(0);
             const showModal = ref(false);
             const tempInput = ref('');
@@ -210,41 +225,57 @@
 
             const currentChar = computed(() => characters.value[activeIdx.value] || null);
 
-            watch(characters, (v) => localStorage.setItem('chars_v3', JSON.stringify(v)), { deep: true });
+            watch(characters, (v) => localStorage.setItem('cards_v4', JSON.stringify(v)), { deep: true });
 
-            // 头像环绕样式
-            const getTagStyle = (i) => {
-                const total = currentChar.value.tags.length;
-                const angle = (i * (360 / total)) - 90;
-                const dist = 90; // 扩散半径
-                const x = Math.cos(angle * Math.PI/180) * dist;
-                const y = Math.sin(angle * Math.PI/180) * dist;
-                const colors = ['#DBEAFE', '#FCE7F3', '#FEF3C7', '#DCFCE7', '#E0E7FF'];
+            // 1. 标签随机位置算法 (避开头像)
+            const getRandTagStyle = (i) => {
+                // 将区域分为4个象限，随机分配
+                const sectors = [
+                    {x:[5,30], y:[5,30]},   // 左上
+                    {x:[65,90], y:[5,40]},  // 右上
+                    {x:[5,35], y:[60,90]},  // 左下
+                    {x:[65,90], y:[55,90]}  // 右下
+                ];
+                const sec = sectors[i % 4];
+                const left = Math.floor(Math.random() * (sec.x[1] - sec.x[0]) + sec.x[0]);
+                const top = Math.floor(Math.random() * (sec.y[1] - sec.y[0]) + sec.y[0]);
+                const rotate = Math.floor(Math.random() * 40 - 20); // -20到20度
+                const colors = ['#FFD6D6', '#D6E4FF', '#E4FFD6', '#FFF8D6', '#F3D6FF'];
+                
                 return {
-                    left: `calc(50% + ${x}px - 20px)`,
-                    top: `calc(50% + ${y}px - 10px)`,
-                    backgroundColor: colors[i % colors.length],
-                    color: '#444',
-                    '--r': `${(Math.random() * 20 - 10)}deg`
-                };
-            };
-
-            // 便签墙随机样式算法
-            const getNoteStyle = (i) => {
-                const colors = ['#fff9c4', '#ffecb3', '#f8bbd0', '#e1f5fe', '#f3e5f5', '#e8f5e9'];
-                // 随机旋转度数
-                const rotate = (Math.sin(i * 13) * 5).toFixed(1); 
-                // 随机左右偏移
-                const marginL = (Math.cos(i * 7) * 15 + 15).toFixed(0); 
-                return {
+                    left: `${left}%`,
+                    top: `${top}%`,
                     backgroundColor: colors[i % colors.length],
                     transform: `rotate(${rotate}deg)`,
-                    marginLeft: `${marginL}px`,
-                    marginTop: `5px`,
-                    borderRadius: '2px'
+                    color: '#555'
                 };
             };
 
+            // 2. 便签墙随机样式
+            const getNoteStyle = (i) => {
+                const colors = ['#fff9c4', '#ffecb3', '#f8bbd0', '#e1f5fe', '#f3e5f5', '#e8f5e9'];
+                const rotate = (Math.sin(i * 25) * 12).toFixed(1); 
+                const scale = (0.9 + Math.random() * 0.2).toFixed(2);
+                const marginTop = (Math.random() * 10).toFixed(0);
+                return {
+                    backgroundColor: colors[i % colors.length],
+                    transform: `rotate(${rotate}deg) scale(${scale})`,
+                    marginTop: `${marginTop}px`
+                };
+            };
+
+            const getPinColor = (i) => {
+                const colors = ['#ff5e5e', '#5eafff', '#ffca5e', '#78ff5e'];
+                return colors[i % 4];
+            };
+
+            // 3. 弹幕颜色循环 (HSL 模式)
+            const getBulletColor = (i) => {
+                const hue = (i * 137.5) % 360; // 使用黄金角度使颜色分布均匀
+                return `hsl(${hue}, 65%, 65%)`;
+            };
+
+            // 核心功能
             const addCharacter = () => {
                 const c = { id: Date.now(), name: '新角色', avatar: '', tags: [], settings: [], details: [], bullets: [] };
                 characters.value.push(c);
@@ -263,7 +294,7 @@
                 reader.readAsDataURL(file);
             };
 
-            const openModal = (type) => {
+            const addItem = (type) => {
                 targetType.value = type;
                 tempInput.value = '';
                 showModal.value = true;
@@ -278,48 +309,43 @@
 
             const startTouch = (type, index) => {
                 touchTimer.value = setTimeout(() => {
-                    if(confirm('要删除这条信息吗？')) {
+                    if(confirm('删除此条内容？')) {
                         currentChar.value[type].splice(index, 1);
                     }
                 }, 800);
             };
             const endTouch = () => clearTimeout(touchTimer.value);
 
-            const delCharacter = () => {
-                if(confirm('确定删除此角色及其所有记录？')) {
-                    characters.value.splice(activeIdx.value, 1);
-                    activeIdx.value = 0;
-                }
-            };
-
             const exportImage = () => {
                 const area = document.getElementById('capture-area');
-                document.body.classList.add('export-mode');
-                
-                // 给图片加载预留时间
+                document.body.classList.add('exporting');
                 setTimeout(() => {
                     html2canvas(area, {
                         useCORS: true,
                         scale: 3,
-                        backgroundColor: '#f0f2f5',
-                        scrollY: -window.scrollY,
-                        onclone: (clonedDoc) => {
-                            clonedDoc.getElementById('capture-area').style.transform = "none";
-                        }
+                        backgroundColor: '#fdfcfb'
                     }).then(canvas => {
                         const link = document.createElement('a');
                         link.download = `${currentChar.value.name}.png`;
                         link.href = canvas.toDataURL('image/png');
                         link.click();
-                        document.body.classList.remove('export-mode');
+                        document.body.classList.remove('exporting');
                     });
                 }, 300);
             };
 
+            const delChar = () => {
+                if(confirm('删除角色？')) {
+                    characters.value.splice(activeIdx.value, 1);
+                    activeIdx.value = 0;
+                }
+            };
+
             return {
                 characters, activeIdx, currentChar, showModal, tempInput,
-                getTagStyle, getNoteStyle, triggerUpload, handleAvatar,
-                openModal, confirmAdd, startTouch, endTouch, addCharacter, delCharacter, exportImage
+                getRandTagStyle, getNoteStyle, getPinColor, getBulletColor,
+                addCharacter, triggerUpload, handleAvatar, addItem, confirmAdd, 
+                startTouch, endTouch, exportImage, delChar
             }
         }
     }).mount('#app');
