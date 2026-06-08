@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色记录卡册 v11 - 性能优化版</title>
+    <title>角色记录卡册 v12 - 高清修正版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -105,7 +105,7 @@
             </div>
         </div>
 
-        <!-- D. 弹幕部分 -->
+        <!-- D. 弹幕 -->
         <div class="mb-10 px-2">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-[10px] font-black text-green-600 tracking-widest uppercase">/ Comments 弹幕</h2>
@@ -130,10 +130,10 @@
         <button @click="delCharacter" class="bg-red-50 text-red-400 py-4 rounded-3xl font-bold border border-red-100 active:scale-95 transition-transform">删除角色</button>
     </div>
 
-    <!-- 输入弹窗 -->
+    <!-- 弹窗 -->
     <div v-if="showModal" class="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-6 z-[9999]">
         <div class="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl">
-            <textarea v-model="tempInput" placeholder="请输入内容..." class="w-full h-32 p-4 bg-gray-50 rounded-2xl outline-none mb-6 focus:ring-2 ring-cyan-400 transition-all"></textarea>
+            <textarea v-model="tempInput" placeholder="输入内容..." class="w-full h-32 p-4 bg-gray-50 rounded-2xl outline-none mb-6"></textarea>
             <div class="flex gap-4">
                 <button @click="showModal = false" class="flex-1 py-3 text-gray-400 font-bold">取消</button>
                 <button @click="confirmAdd" class="flex-1 py-3 bg-cyan-500 text-white rounded-2xl font-bold">确认添加</button>
@@ -147,8 +147,7 @@
 
     createApp({
         setup() {
-            // 使用新版 key 避免老版本大数据堵塞
-            const STORAGE_KEY = 'cards_data_v11';
+            const STORAGE_KEY = 'cards_data_v12';
             const characters = ref(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []);
             const activeIdx = ref(0);
             const showModal = ref(false);
@@ -163,8 +162,7 @@
                 try {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
                 } catch (e) {
-                    console.error("Storage Full", e);
-                    alert("提示：浏览器存储空间已满。请尝试点击右上角'清空缓存'或删除不用的角色图片。");
+                    alert("存储空间已满，请清理一些角色或点击右上角清空缓存。");
                 }
             }, { deep: true });
 
@@ -174,6 +172,7 @@
                 return Math.max(250, maxY + 150);
             });
 
+            // 1. 头像处理优化：提升清晰度并修正变形
             const handleAvatar = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -186,35 +185,31 @@
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
                         
-                        // 1. 设定的最终尺寸 (小而精，节省空间)
-                        const targetSize = 160; 
+                        // 提升分辨率到 400px，保证高清显示
+                        const targetSize = 400; 
                         canvas.width = targetSize;
                         canvas.height = targetSize;
 
-                        // 2. 居中裁剪算法 (修复变形)
                         let sx, sy, sWidth, sHeight;
                         const aspect = img.width / img.height;
-                        if (aspect > 1) { // 横图
-                            sHeight = img.height;
-                            sWidth = img.height;
-                            sx = (img.width - sWidth) / 2;
-                            sy = 0;
-                        } else { // 竖图
-                            sWidth = img.width;
-                            sHeight = img.width;
-                            sx = 0;
-                            sy = (img.height - sHeight) / 2;
+                        if (aspect > 1) { // 横屏图
+                            sHeight = img.height; sWidth = img.height;
+                            sx = (img.width - sWidth) / 2; sy = 0;
+                        } else { // 竖屏图
+                            sWidth = img.width; sHeight = img.width;
+                            sx = 0; sy = (img.height - sHeight) / 2;
                         }
 
                         ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetSize, targetSize);
                         
-                        // 3. 极致压缩 (0.5 质量可大幅缩减 Base64 长度)
-                        currentChar.value.avatar = canvas.toDataURL('image/jpeg', 0.5);
+                        // 质量提升至 0.85，兼顾清晰度与体积
+                        currentChar.value.avatar = canvas.toDataURL('image/jpeg', 0.85);
                     };
                 };
                 reader.readAsDataURL(file);
             };
 
+            // 2. 添加位置优化：标签生成在左上角
             const confirmAdd = () => {
                 if (!tempInput.value.trim()) return;
                 const colors = ['#FFF9C4', '#F8BBD0', '#E1F5FE', '#E8F5E9', '#F3E5F5'];
@@ -224,21 +219,21 @@
                     currentChar.value[type].push(tempInput.value.trim());
                 } else {
                     maxZ.value++;
-                    // 扩大随机范围并保证在容器内
                     let rx, ry;
                     if(type === 'tags') {
-                        rx = Math.random() * 240; // 标签区宽
-                        ry = Math.random() * 200; // 标签区高
+                        // 标签出现在左上角区域（0-30px 随机偏移）
+                        rx = 10 + Math.random() * 20; 
+                        ry = 10 + Math.random() * 20;
                     } else {
-                        rx = Math.random() * 180; // 细节墙宽
-                        ry = Math.random() * 100; // 细节墙初始高度
+                        // 细节墙出现在其容器的左上角
+                        rx = 10 + Math.random() * 20;
+                        ry = 10 + Math.random() * 20;
                     }
 
                     const newItem = {
                         text: tempInput.value.trim(),
-                        x: rx,
-                        y: ry,
-                        r: Math.random() * 20 - 10,
+                        x: rx, y: ry,
+                        r: Math.random() * 10 - 5, // 初始倾斜角度也调小一点，显得整齐
                         z: maxZ.value,
                         c: colors[Math.floor(Math.random() * colors.length)]
                     };
@@ -281,19 +276,12 @@
                 document.addEventListener('touchend', stopDrag);
             };
 
-            const clearAllData = () => {
-                if(confirm('这将清空所有角色数据，确定吗？')) {
-                    localStorage.clear();
-                    location.reload();
-                }
-            };
-
+            const clearAllData = () => { if(confirm('重置所有数据？')) { localStorage.clear(); location.reload(); } };
             const addCharacter = () => {
                 const newChar = { id: Date.now(), name: '新角色', avatar: '', tags: [], settings: [], details: [], bullets: [] };
                 characters.value.push(newChar);
                 activeIdx.value = characters.value.length - 1;
             };
-
             const triggerUpload = () => document.getElementById('avatar-input').click();
             const openInput = (type) => { targetType.value = type; tempInput.value = ''; showModal.value = true; };
             const handleLongPress = (type, index) => { touchTimer.value = setTimeout(() => { if (confirm('确认删除？')) currentChar.value[type].splice(index, 1); }, 800); };
