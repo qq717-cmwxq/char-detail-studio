@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OC角色管理卡册</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- 引入 html2canvas (用于导出图片) -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <!-- 引入 Lucide 图标 -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #e0e7ff 0%, #cbd5e1 100%);
+            overscroll-behavior-y: contain; /* 禁用下拉刷新方便操作 */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        /* 这里的动画是为了长按时给用户反馈 */
+        .press-feedback {
+            transition: transform 0.2s;
+        }
+        .press-feedback:active {
+            transform: scale(0.95);
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+<div id="app" class="max-w-md mx-auto p-4 pb-32">
+    <!-- 头部导航 -->
+    <header class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-black text-blue-900 tracking-tighter">角色卡册</h1>
+        <button @click="addCharacter" class="bg-blue-600 text-white p-3 rounded-full shadow-lg active:scale-90 transition-transform">
+            <i data-lucide="plus"></i>
+        </button>
+    </header>
+
+    <!-- 角色选择滑动条 -->
+    <div class="flex space-x-3 overflow-x-auto pb-6 no-scrollbar">
+        <div v-for="(char, index) in characters" :key="char.id" 
+             @click="activeIdx = index"
+             :class="['px-5 py-2 rounded-full whitespace-nowrap transition-all duration-300 shadow-sm text-sm font-medium', 
+                      activeIdx === index ? 'bg-blue-600 text-white scale-105' : 'bg-white/50 text-blue-800 backdrop-blur-md']">
+            {{ char.name || '未命名' }}
+        </div>
+    </div>
+
+    <!-- 角色主卡片区域 -->
+    <div v-if="currentCharacter" id="card-capture" class="relative">
+        <div class="glass-card rounded-[2.5rem] p-8 shadow-2xl overflow-hidden relative">
+            
+            <!-- 头像部分 -->
+            <div class="flex flex-col items-center mb-8">
+                <div @click="triggerUpload" class="relative group cursor-pointer">
+                    <div class="w-36 h-36 rounded-full border-4 border-white shadow-xl overflow-hidden bg-blue-50 flex items-center justify-center">
+                        < img v-if="currentCharacter.avatar" :src="currentCharacter.avatar" class="w-full h-full object-cover" />
+                        <i v-else data-lucide="image" class="text-blue-200 w-12 h-12"></i>
+                    </div>
+                    <div class="absolute bottom-1 right-1 bg-blue-600 text-white p-2 rounded-full border-2 border-white shadow-lg">
+                        <i data-lucide="camera" class="w-4 h-4"></i>
+                    </div>
+                    <input type="file" ref="fileInput" class="hidden" @change="handleAvatarUpload" accept="image/*">
+                </div>
+                
+                <input v-model="currentCharacter.name" 
+                       class="mt-6 bg-transparent text-center text-2xl font-bold text-blue-900 placeholder:text-blue-300 focus:outline-none w-full"
+                       placeholder="点击输入角色名">
+            </div>
+
+            <!-- 内容板块 -->
+            <div class="space-y-8">
+                
+                <!-- 1. 标签板块 -->
+                <section>
+                    <div class="flex items-center justify-between mb-3 px-1">
+                        <span class="text-[10px] font-black text-blue-800/40 uppercase tracking-[0.2em]"># Tags</span>
+                        <button @click="addItem('tags')" class="text-blue-600"><i data-lucide="plus-circle" class="w-4 h-4"></i></button>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <div v-for="(tag, i) in currentCharacter.tags" :key="i" 
+                             @touchstart="startPress('tags', i)" @touchend="endPress" @mousedown="startPress('tags', i)" @mouseup="endPress"
+                             class="press-feedback bg-blue-500/10 border border-blue-500/20 text-blue-700 px-3 py-1 rounded-lg text-xs font-medium">
+                            # {{ tag }}
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. 设定板块 -->
+                <section>
+                    <div class="flex items-center justify-between mb-3 px-1">
+                        <span class="text-[10px] font-black text-blue-800/40 uppercase tracking-[0.2em]">Settings</span>
+                        <button @click="addItem('settings')" class="text-blue-600"><i data-lucide="plus-circle" class="w-4 h-4"></i></button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div v-for="(item, i) in currentCharacter.settings" :key="i"
+                             @touchstart="startPress('settings', i)" @touchend="endPress" @mousedown="startPress('settings', i)" @mouseup="endPress"
+                             class="press-feedback bg-white/30 p-3 rounded-xl text-xs text-blue-900 border border-white/40 shadow-sm">
+                            {{ item }}
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. 细节板块 -->
+                <section>
+                    <div class="flex items-center justify-between mb-3 px-1">
+                        <span class="text-[10px] font-black text-blue-800/40 uppercase tracking-[0.2em]">Details</span>
+                        <button @click="addItem('details')" class="text-blue-600"><i data-lucide="plus-circle" class="w-4 h-4"></i></button>
+                    </div>
+                    <div class="space-y-3">
+                        <div v-for="(detail, i) in currentCharacter.details" :key="i"
+                             @touchstart="startPress('details', i)" @touchend="endPress" @mousedown="startPress('details', i)" @mouseup="endPress"
+                             class="press-feedback bg-white/50 p-4 rounded-2xl text-sm text-blue-900 leading-relaxed shadow-sm border border-white/50">
+                            {{ detail }}
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. 弹幕板块 -->
+                <section>
+                    <div class="flex items-center justify-between mb-3 px-1">
+                        <span class="text-[10px] font-black text-blue-800/40 uppercase tracking-[0.2em]">Comments</span>
+                        <button @click="addItem('comments')" class="text-blue-600"><i data-lucide="plus-circle" class="w-4 h-4"></i></button>
+                    </div>
+                    <div class="flex flex-col gap-2 items-start">
+                        <div v-for="(comment, i) in currentCharacter.comments" :key="i"
+                             @touchstart="startPress('comments', i)" @touchend="endPress" @mousedown="startPress('comments', i)" @mouseup="endPress"
+                             class="press-feedback bg-blue-600 text-white px-4 py-2 rounded-full rounded-bl-none text-xs italic shadow-md">
+                            “ {{ comment }} ”
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部悬浮操作栏 -->
+    <div class="fixed bottom-8 left-0 right-0 px-6 flex gap-4 max-w-md mx-auto">
+        <button @click="saveAsImage" class="flex-1 bg-blue-600 text-white py-4 rounded-3xl font-bold shadow-2xl flex items-center justify-center gap-2 active:scale-95 transition-all">
+            <i data-lucide="download" class="w-5 h-5"></i> 导出卡片图片
+        </button>
+        <button @click="removeCharacter" class="bg-red-100 text-red-500 p-4 rounded-3xl active:scale-95 transition-all shadow-lg">
+            <i data-lucide="trash-2" class="w-6 h-6"></i>
+        </button>
+    </div>
+
+    <!-- 操作提示 -->
+    <p class="text-center text-blue-400 text-[10px] mt-8 mb-20 uppercase tracking-widest">长按条目可进行删除</p >
+</div>
+
+<script>
+    const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
+
+    createApp({
+        setup() {
+            // 初始化数据
+            const characters = ref(JSON.parse(localStorage.getItem('oc_cards_v1')) || [
+                {
+                    id: Date.now(),
+                    name: '示范角色',
+                    avatar: '',
+                    tags: ['年上', '美强惨'],
+                    settings: ['银发', '戴单边眼镜'],
+                    details: ['喝咖啡从不加糖', '右手虎口处有一颗小痣'],
+                    comments: ['这角色设定我真的会谢，太香了！']
+                }
+            ]);
+            
+            const activeIdx = ref(0);
+            const fileInput = ref(null);
+            let pressTimer = null;
+
+            const currentCharacter = computed(() => characters.value[activeIdx.value]);
+
+            // 监听数据变化，自动保存到本地存储
+            watch(characters, (newVal) => {
+                localStorage.setItem('oc_cards_v1', JSON.stringify(newVal));
+            }, { deep: true });
+
+            // 重新初始化图标
+            const refreshIcons = () => {
+                nextTick(() => lucide.createIcons());
+            };
+
+            onMounted(refreshIcons);
+            watch(activeIdx, refreshIcons);
+
+            // 角色管理
+            const addCharacter = () => {
+                const newChar = {
+                    id: Date.now(),
+                    name: '新角色',
+                    avatar: '',
+                    tags: [],
+                    settings: [],
+                    details: [],
+                    comments: []
+                };
+                characters.value.push(newChar);
+                activeIdx.value = characters.value.length - 1;
+                refreshIcons();
+            };
+
+            const removeCharacter = () => {
+                if (confirm('确定要删除这个角色卡吗？此操作不可撤销。')) {
+                    characters.value.splice(activeIdx.value, 1);
+                    if (activeIdx.value > 0) activeIdx.value--;
+                    if (characters.value.length === 0) addCharacter();
+                }
+            };
+
+            // 条目管理
+            const addItem = (type) => {
+                const val = prompt(`添加新${type === 'tags' ? '标签' : '内容'}:`);
+                if (val && val.trim()) {
+                    currentCharacter.value[type].push(val.trim());
+                }
+            };
+
+            // 长按逻辑
+            const startPress = (type, index) => {
+                pressTimer = setTimeout(() => {
+                    if (confirm('要删除这一条内容吗？')) {
+                        currentCharacter.value[type].splice(index, 1);
+                    }
+                }, 600);
+            };
+
+            const endPress = () => {
+                clearTimeout(pressTimer);
+            };
+
+            // 头像上传
+            const triggerUpload = () => fileInput.value.click();
+            const handleAvatarUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    currentCharacter.value.avatar = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            };
+
+            // 导出图片
+            const saveAsImage = () => {
+                const btn = event.currentTarget;
+                btn.innerText = "生成中...";
+                const area = document.getElementById('card-capture');
+                
+                html2canvas(area, {
+                    useCORS: true,
+                    scale: 3, // 高清
+                    backgroundColor: null,
+                    borderRadius: 40,
+                }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `${currentCharacter.value.name}_卡册.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    btn.innerHTML = '<i data-lucide="download" class="w-5 h-5"></i> 导出卡片图片';
+                    refreshIcons();
+                });
+            };
+
+            return {
+                characters, activeIdx, currentCharacter,
+                addCharacter, removeCharacter, triggerUpload, handleAvatarUpload,
+                addItem, startPress, endPress, saveAsImage, fileInput
+            };
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
