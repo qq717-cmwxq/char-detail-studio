@@ -3,22 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色记录卡册 v13 - 存档管理版</title>
+    <title>角色记录卡册 v14 - 导出修正版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
         body { background: #f0f4f8; font-family: sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+        
+        /* 布局修正 */
         .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.4); }
-        .exporting .glass { backdrop-filter: none !important; background: #ffffff !important; }
-        .draggable-item { position: absolute; touch-action: none; user-select: none; will-change: transform; box-shadow: 2px 4px 12px rgba(0,0,0,0.1); cursor: move; }
-        .water-chip { background: #CCF2F4; color: #008D96; border: 1px solid #A7E4E9; }
-        .bubble { position: relative; padding: 10px 18px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; display: inline-block; }
+        
+        /* 修复偏移的关键：显式定义行高和对齐方式 */
+        .draggable-item { 
+            position: absolute; touch-action: none; user-select: none; 
+            display: inline-flex; align-items: center; justify-content: center;
+            line-height: 1.2; text-align: center;
+            padding: 4px 12px;
+            box-shadow: 2px 4px 10px rgba(0,0,0,0.08); 
+        }
+
+        .bubble { 
+            position: relative; padding: 10px 18px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; 
+            display: inline-flex; align-items: center; line-height: 1.2;
+        }
+
+        /* 导出时强制简化 CSS */
+        .exporting .glass { backdrop-filter: none !important; background: #ffffff !important; border: 2px solid #eee !important; }
+        .exporting .draggable-item { box-shadow: none !important; border: 0.5px solid rgba(0,0,0,0.1) !important; }
+        
         .bubble-left { border-bottom-left-radius: 2px; }
         .bubble-left::after { content: ""; position: absolute; bottom: 0; left: -8px; width: 12px; height: 14px; background: inherit; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
         .bubble-right { border-bottom-right-radius: 2px; }
         .bubble-right::after { content: ""; position: absolute; bottom: 0; right: -8px; width: 12px; height: 14px; background: inherit; clip-path: polygon(0 0, 0 100%, 100% 100%); }
+        
+        .water-chip { background: #CCF2F4; color: #008D96; border: 1px solid #A7E4E9; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         [v-cloak] { display: none; }
     </style>
@@ -29,17 +48,22 @@
     <!-- 顶部 -->
     <div class="flex justify-between items-center mb-6">
         <h1 style="font-family: 'ZCOOL KuaiLe';" class="text-3xl text-cyan-500">CardBox</h1>
-        <div class="flex gap-2">
-            <button @click="addCharacter" class="w-10 h-10 bg-cyan-500 text-white rounded-full text-2xl shadow-lg">+</button>
-        </div>
+        <button @click="addCharacter" class="w-10 h-10 bg-cyan-500 text-white rounded-full text-2xl shadow-lg">+</button>
     </div>
 
-    <!-- 存档管理按钮栏 -->
-    <div class="flex gap-2 mb-4">
-        <button @click="exportData" class="flex-1 py-2 bg-gray-800 text-white text-[10px] rounded-xl font-bold">导出备份(全员)</button>
-        <button @click="$refs.importFile.click()" class="flex-1 py-2 bg-white border border-gray-200 text-gray-600 text-[10px] rounded-xl font-bold">恢复备份</button>
-        <input type="file" ref="importFile" class="hidden" accept=".json" @change="importData">
-        <button @click="clearAllData" class="px-3 py-2 bg-red-50 text-red-400 text-[10px] rounded-xl">重置</button>
+    <!-- 档案管理区 -->
+    <div class="bg-white rounded-3xl p-4 mb-6 shadow-sm border border-gray-100">
+        <div class="text-[10px] font-bold text-gray-400 mb-3 uppercase tracking-widest">Archive Management / 存档管理</div>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+            <button @click="exportSingle" class="py-2 bg-cyan-50 text-cyan-600 text-[11px] rounded-xl font-bold">导出单人存档</button>
+            <button @click="$refs.importOne.click()" class="py-2 bg-blue-50 text-blue-600 text-[11px] rounded-xl font-bold">追加单人导入</button>
+        </div>
+        <div class="grid grid-cols-2 gap-2 border-t border-gray-50 pt-2">
+            <button @click="exportAll" class="py-2 bg-gray-800 text-white text-[11px] rounded-xl font-bold">导出全员备份</button>
+            <button @click="$refs.importAll.click()" class="py-2 bg-white border border-gray-200 text-gray-600 text-[11px] rounded-xl font-bold">恢复全员备份</button>
+        </div>
+        <input type="file" ref="importOne" class="hidden" accept=".json" @change="importSingle">
+        <input type="file" ref="importAll" class="hidden" accept=".json" @change="importAll">
     </div>
 
     <!-- 角色导航 -->
@@ -58,7 +82,7 @@
         <!-- A. 标签与头像 -->
         <div class="relative h-80 w-full mb-4" id="tag-zone">
             <div v-for="(tag, i) in currentChar.tags" :key="i"
-                 class="draggable-item px-3 py-1 rounded-full text-[10px] font-bold"
+                 class="draggable-item rounded-full text-[10px] font-bold"
                  @touchstart="startDrag($event, tag, 'tags', i)"
                  :style="{ left: tag.x + 'px', top: tag.y + 'px', transform: 'rotate('+tag.r+'deg)', backgroundColor: tag.c, color: '#444', zIndex: tag.z }">
                 #{{ tag.text }}
@@ -121,19 +145,19 @@
         </div>
     </div>
 
-    <!-- 操作 -->
+    <!-- 底部操作 -->
     <div v-if="currentChar" class="mt-8 grid grid-cols-2 gap-4 pb-12 px-2">
-        <button @click="exportImage" class="bg-gray-800 text-white py-4 rounded-3xl font-bold">导出图片</button>
+        <button @click="exportImage" class="bg-gray-800 text-white py-4 rounded-3xl font-bold shadow-lg">导出图片</button>
         <button @click="delCharacter" class="bg-red-50 text-red-400 py-4 rounded-3xl font-bold border border-red-100">删除角色</button>
     </div>
 
-    <!-- 弹窗 -->
+    <!-- 输入弹窗 -->
     <div v-if="showModal" class="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-6 z-[9999]">
         <div class="bg-white rounded-[2rem] p-6 w-full max-w-sm">
-            <textarea v-model="tempInput" placeholder="内容..." class="w-full h-32 p-4 bg-gray-50 rounded-2xl outline-none mb-6"></textarea>
+            <textarea v-model="tempInput" placeholder="输入内容..." class="w-full h-32 p-4 bg-gray-50 rounded-2xl outline-none mb-6"></textarea>
             <div class="flex gap-4">
                 <button @click="showModal = false" class="flex-1 py-3 text-gray-400 font-bold">取消</button>
-                <button @click="confirmAdd" class="flex-1 py-3 bg-cyan-500 text-white rounded-2xl font-bold">确认</button>
+                <button @click="confirmAdd" class="flex-1 py-3 bg-cyan-500 text-white rounded-2xl font-bold">确定</button>
             </div>
         </div>
     </div>
@@ -144,7 +168,7 @@
 
     createApp({
         setup() {
-            const STORAGE_KEY = 'cards_data_final';
+            const STORAGE_KEY = 'cards_v14_final';
             const characters = ref(JSON.parse(localStorage.getItem(STORAGE_KEY)) || []);
             const activeIdx = ref(0);
             const showModal = ref(false);
@@ -159,41 +183,69 @@
                 try {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
                 } catch (e) {
-                    alert("⚠️ 浏览器存储已满！建议点击上方'导出备份'保存文件，然后清空一些角色后再继续添加。");
+                    alert("⚠️ 存储空间已满。请导出部分单人角色存档并删除，以腾出空间。");
                 }
             }, { deep: true });
 
-            // [新增] 导出全部数据为 JSON 文件
-            const exportData = () => {
-                const data = JSON.stringify(characters.value);
+            // [新增] 单人导出
+            const exportSingle = () => {
+                if(!currentChar.value) return;
+                const data = JSON.stringify(currentChar.value);
                 const blob = new Blob([data], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `我的角色卡册备份_${new Date().toLocaleDateString()}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
+                downloadBlob(blob, `角色_${currentChar.value.name}.json`);
             };
 
-            // [新增] 从 JSON 文件恢复数据
-            const importData = (e) => {
+            // [新增] 单人追加导入
+            const importSingle = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     try {
                         const imported = JSON.parse(event.target.result);
+                        if (imported && imported.id) {
+                            // 赋予新ID防止冲突
+                            imported.id = Date.now();
+                            characters.value.push(imported);
+                            activeIdx.value = characters.value.length - 1;
+                            alert(`已追加导入角色：${imported.name}`);
+                        }
+                    } catch (err) { alert("导入失败，文件格式不正确"); }
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+            };
+
+            const exportAll = () => {
+                const data = JSON.stringify(characters.value);
+                const blob = new Blob([data], { type: 'application/json' });
+                downloadBlob(blob, `全员备份_${new Date().toLocaleDateString()}.json`);
+            };
+
+            const importAll = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const imported = JSON.parse(ev.target.result);
                         if (Array.isArray(imported)) {
-                            if (confirm(`检测到 ${imported.length} 个角色，是否覆盖当前所有内容？`)) {
+                            if (confirm(`检测到 ${imported.length} 个角色，是否替换现有全部数据？`)) {
                                 characters.value = imported;
                                 activeIdx.value = 0;
                             }
                         }
-                    } catch (err) {
-                        alert("文件格式错误，请确保上传的是有效的卡册备份文件。");
-                    }
+                    } catch (err) { alert("全量恢复失败，请检查文件"); }
                 };
                 reader.readAsText(file);
+                e.target.value = '';
+            };
+
+            const downloadBlob = (blob, fileName) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = fileName; a.click();
+                URL.revokeObjectURL(url);
             };
 
             const wallHeight = computed(() => {
@@ -213,18 +265,12 @@
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
                         const targetSize = 400; 
-                        canvas.width = targetSize;
-                        canvas.height = targetSize;
+                        canvas.width = targetSize; canvas.height = targetSize;
                         const aspect = img.width / img.height;
-                        let sx, sy, sWidth, sHeight;
-                        if (aspect > 1) { 
-                            sHeight = img.height; sWidth = img.height;
-                            sx = (img.width - sWidth) / 2; sy = 0;
-                        } else { 
-                            sWidth = img.width; sHeight = img.width;
-                            sx = 0; sy = (img.height - sHeight) / 2;
-                        }
-                        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetSize, targetSize);
+                        let sx, sy, sw, sh;
+                        if (aspect > 1) { sh = img.height; sw = img.height; sx = (img.width - sw) / 2; sy = 0; }
+                        else { sw = img.width; sh = img.width; sx = 0; sy = (img.height - sh) / 2; }
+                        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetSize, targetSize);
                         currentChar.value.avatar = canvas.toDataURL('image/jpeg', 0.8);
                     };
                 };
@@ -259,9 +305,7 @@
                 const startX = touch.clientX - item.x;
                 const startY = touch.clientY - item.y;
                 maxZ.value++; item.z = maxZ.value;
-                touchTimer.value = setTimeout(() => {
-                    if(confirm('删除此内容？')) currentChar.value[type].splice(index, 1);
-                }, 800);
+                touchTimer.value = setTimeout(() => { if(confirm('删除此内容？')) currentChar.value[type].splice(index, 1); }, 800);
                 const moveDrag = (ev) => {
                     clearTimeout(touchTimer.value);
                     item.x = ev.touches[0].clientX - startX;
@@ -276,19 +320,18 @@
                 document.addEventListener('touchend', stopDrag);
             };
 
-            const clearAllData = () => { if(confirm('重置所有数据？')) { localStorage.clear(); location.reload(); } };
-            const addCharacter = () => {
-                characters.value.push({ id: Date.now(), name: '新角色', avatar: '', tags: [], settings: [], details: [], bullets: [] });
-                activeIdx.value = characters.value.length - 1;
-            };
-            const triggerUpload = () => document.getElementById('avatar-input').click();
-            const openInput = (type) => { targetType.value = type; tempInput.value = ''; showModal.value = true; };
-            const handleLongPress = (type, index) => { touchTimer.value = setTimeout(() => { if (confirm('确认删除？')) currentChar.value[type].splice(index, 1); }, 800); };
             const getGreenGradient = (i) => ['linear-gradient(135deg, #a8e063 0%, #56ab2f 100%)', 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', 'linear-gradient(135deg, #7CB342 100%)'][i % 3];
+
             const exportImage = () => {
+                const area = document.getElementById('capture-area');
                 document.body.classList.add('exporting');
+                // 等待布局重绘
                 setTimeout(() => {
-                    html2canvas(document.getElementById('capture-area'), { useCORS: true, scale: 2 }).then(canvas => {
+                    html2canvas(area, { 
+                        useCORS: true, 
+                        scale: 2,
+                        backgroundColor: '#f0f4f8'
+                    }).then(canvas => {
                         const link = document.createElement('a');
                         link.download = `${currentChar.value.name}.png`;
                         link.href = canvas.toDataURL('image/png');
@@ -297,6 +340,7 @@
                     });
                 }, 500);
             };
+
             const delCharacter = () => {
                 if (confirm('删除角色？')) {
                     characters.value.splice(activeIdx.value, 1);
@@ -304,11 +348,16 @@
                 }
             };
 
+            const addCharacter = () => {
+                characters.value.push({ id: Date.now(), name: '新角色', avatar: '', tags: [], settings: [], details: [], bullets: [] });
+                activeIdx.value = characters.value.length - 1;
+            };
+
             return {
                 characters, activeIdx, currentChar, showModal, tempInput, wallHeight,
                 addCharacter, triggerUpload, handleAvatar, openInput, confirmAdd, 
-                startDrag, handleLongPress, getGreenGradient, exportImage, delCharacter, 
-                clearAllData, exportData, importData
+                startDrag, getGreenGradient, exportImage, delCharacter, 
+                exportSingle, importSingle, exportAll, importAll, clearAllData: () => { if(confirm('全清？')) { localStorage.clear(); location.reload(); } }
             }
         }
     }).mount('#app');
