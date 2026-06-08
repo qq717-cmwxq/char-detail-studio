@@ -9,85 +9,70 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
-
-        body { background: #f7f8fa; font-family: sans-serif; }
+        body { background: #f0f2f5; font-family: sans-serif; overflow-x: hidden; }
         .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.4); }
         .exporting .glass { backdrop-filter: none !important; background: #fff !important; }
 
-        /* 标签与便签的基础样式 */
-        .floating-item { position: absolute; cursor: pointer; transition: transform 0.2s; }
+        /* 标签随机漂浮 - 绝对定位 */
+        .safe-tag { position: absolute; z-index: 50; transition: all 0.3s ease; }
         
-        /* 详情墙样式 */
-        .details-wall { position: relative; min-height: 450px; background: rgba(255,255,255,0.2); border-radius: 20px; overflow: hidden; }
-
-        /* 弹幕气泡样式 */
-        .bubble {
-            position: relative;
-            padding: 8px 15px;
-            border-radius: 18px;
-            font-size: 12px;
-            font-weight: bold;
-            color: white;
-            display: inline-block;
-        }
-        .bubble::after {
-            content: '';
-            position: absolute;
-            width: 0; height: 0;
-            border-top: 8px solid transparent;
-            border-bottom: 8px solid transparent;
-            bottom: -5px;
-        }
-        .bubble-left::after { border-right: 12px solid currentColor; left: 10px; transform: rotate(45deg); filter: brightness(1); }
-        .bubble-right::after { border-left: 12px solid currentColor; right: 10px; transform: rotate(-45deg); filter: brightness(1); }
+        /* 详情墙 - 动态增长布局 */
+        .details-wall { display: flex; flex-wrap: wrap; gap: 12px; padding: 15px; min-height: 100px; }
+        .sticky-note { position: relative; display: inline-block; transition: transform 0.2s; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); }
 
         /* 装饰物 */
-        .tape { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 40px; height: 15px; background: rgba(255,255,255,0.5); border: 1px solid rgba(0,0,0,0.05); }
-        .pin { position: absolute; top: -5px; left: 50%; transform: translateX(-50%); width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
-        
+        .tape-deco { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); width: 35px; height: 12px; background: rgba(255,255,255,0.45); border: 1px solid rgba(0,0,0,0.03); backdrop-filter: blur(1px); z-index: 10; }
+        .pin-deco { position: absolute; top: -5px; left: 50%; transform: translateX(-50%); width: 7px; height: 7px; border-radius: 50%; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+
+        /* 弹幕对话气泡修复 */
+        .bullet-bubble { position: relative; padding: 10px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; display: inline-block; max-width: 80%; }
+        .bubble-left { border-bottom-left-radius: 2px; margin-left: 10px; }
+        .bubble-left::before { content: ""; position: absolute; bottom: 0; left: -8px; width: 12px; height: 15px; background: inherit; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+        .bubble-right { border-bottom-right-radius: 2px; margin-right: 10px; }
+        .bubble-right::before { content: ""; position: absolute; bottom: 0; right: -8px; width: 12px; height: 15px; background: inherit; clip-path: polygon(0 0, 0 100%, 100% 100%); }
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
 <div id="app" class="max-w-md mx-auto p-4 min-h-screen">
     
-    <!-- 顶部导航 -->
+    <!-- 头部 -->
     <div class="flex justify-between items-center mb-6 px-2">
         <h1 style="font-family: 'ZCOOL KuaiLe';" class="text-3xl text-indigo-400">CardBox</h1>
-        <button @click="addCharacter" class="w-10 h-10 bg-indigo-500 text-white rounded-full text-2xl shadow-lg">+</button>
+        <button @click="addCharacter" class="w-10 h-10 bg-indigo-500 text-white rounded-full text-2xl shadow-lg active:scale-90">+</button>
     </div>
 
     <!-- 角色切换 -->
     <div v-if="characters.length > 0" class="flex space-x-2 overflow-x-auto no-scrollbar mb-6">
         <div v-for="(char, index) in characters" :key="char.id" 
              @click="activeIdx = index"
-             class="flex-shrink-0 px-5 py-2 rounded-2xl text-xs font-bold transition-all shadow-sm"
-             :class="activeIdx === index ? 'bg-indigo-500 text-white' : 'bg-white text-gray-400'">
+             class="flex-shrink-0 px-5 py-2 rounded-2xl text-xs font-bold transition-all"
+             :class="activeIdx === index ? 'bg-indigo-500 text-white shadow-md' : 'bg-white text-gray-400'">
             {{ char.name || '未命名' }}
         </div>
     </div>
 
-    <!-- 主卡片 -->
-    <div v-if="currentChar" id="capture-area" class="glass rounded-[3rem] p-6 relative overflow-visible min-h-[900px] flex flex-col">
+    <!-- 主卡片区 -->
+    <div v-if="currentChar" id="capture-area" class="glass rounded-[3rem] p-6 relative overflow-hidden min-h-[800px] flex flex-col">
         
-        <!-- 头像区域 (标签在此随机) -->
-        <div class="relative h-72 w-full mb-4" style="z-index: 50;">
-            <!-- 标签 -->
+        <!-- 1. 标签 + 头像区域 (已修复遮挡问题) -->
+        <div class="relative h-72 w-full mb-4" id="avatar-zone">
+            <!-- 随机标签 -->
             <div v-for="(tag, i) in currentChar.tags" :key="i"
-                 class="floating-item px-3 py-1 rounded-full text-[10px] font-bold shadow-sm"
+                 class="safe-tag px-3 py-1 rounded-full text-[10px] font-bold shadow-sm whitespace-nowrap"
                  @touchstart="startTouch('tags', i)" @touchend="endTouch"
-                 :style="{ left: tag.x + '%', top: tag.y + '%', transform: 'rotate('+tag.r+'deg)', backgroundColor: tag.c }">
+                 :style="{ left: tag.x + '%', top: tag.y + '%', transform: 'rotate('+tag.r+'deg)', backgroundColor: tag.c, color: '#444' }">
                 #{{ tag.text }}
             </div>
 
             <!-- 头像中心 -->
             <div class="absolute inset-0 flex items-center justify-center">
-                <div class="relative">
+                <div class="relative z-[60]">
                     <div @click="triggerUpload" class="w-32 h-32 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-white flex items-center justify-center">
                         < img v-if="currentChar.avatar" :src="currentChar.avatar" class="w-full h-full object-cover">
-                        <span v-else class="text-gray-300 text-xs">上传图片</span>
+                        <span v-else class="text-gray-300 text-xs">上传头像</span>
                     </div>
-                    <!-- 右下角加号 -->
                     <button @click="openInput('tags')" class="absolute bottom-1 right-1 w-8 h-8 bg-blue-400 text-white rounded-full border-2 border-white flex items-center justify-center shadow-md">+</button>
                 </div>
                 <input type="file" id="avatar-input" class="hidden" accept="image/*" @change="handleAvatar">
@@ -95,39 +80,54 @@
         </div>
 
         <!-- 角色名 -->
-        <input type="text" v-model="currentChar.name" class="w-full text-center bg-transparent text-2xl font-black text-gray-700 outline-none mb-6">
+        <input type="text" v-model="currentChar.name" class="w-full text-center bg-transparent text-2xl font-black text-gray-800 outline-none mb-6">
 
-        <!-- 详情墙 (随手贴区) -->
-        <div class="mb-10">
-            <div class="flex justify-between items-center mb-4 px-2">
+        <!-- 2. 设定板块 (恢复) -->
+        <div class="mb-8 px-2">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-[10px] font-black text-purple-400 tracking-widest uppercase">/ Settings 设定</h2>
+                <button @click="openInput('settings')" class="w-6 h-6 bg-purple-100 text-purple-600 rounded-full">+</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <div v-for="(s, i) in currentChar.settings" :key="i"
+                     @touchstart="startTouch('settings', i)" @touchend="endTouch"
+                     class="px-4 py-1.5 bg-purple-50 text-purple-500 rounded-lg text-xs font-bold border border-purple-100">
+                    {{ s }}
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 细节墙 (动态增长且不重叠) -->
+        <div class="mb-8 px-2">
+            <div class="flex justify-between items-center mb-4">
                 <h2 class="text-[10px] font-black text-yellow-500 tracking-widest uppercase">/ Details Wall 细节墙</h2>
                 <button @click="openInput('details')" class="w-6 h-6 bg-yellow-100 text-yellow-600 rounded-full">+</button>
             </div>
             <div class="details-wall">
                 <div v-for="(note, i) in currentChar.details" :key="i"
-                     class="floating-item p-3 shadow-md min-w-[80px] max-w-[140px] text-[11px] text-gray-700"
+                     class="sticky-note p-3 min-w-[80px] max-w-[150px] text-[11px] text-gray-700"
                      @touchstart="startTouch('details', i)" @touchend="endTouch"
-                     :style="{ left: note.x + '%', top: note.y + '%', transform: 'rotate('+note.r+'deg)', backgroundColor: note.c }">
-                    <div v-if="note.type === 'tape'" class="tape"></div>
-                    <div v-else class="pin" :style="{backgroundColor: note.pinC}"></div>
+                     :style="{ backgroundColor: note.c, transform: `rotate(${note.r}deg) translate(${note.ox}px, ${note.oy}px)` }">
+                    <div v-if="note.deco === 'tape'" class="tape-deco"></div>
+                    <div v-else class="pin-deco" :style="{ backgroundColor: note.pinC }"></div>
                     {{ note.text }}
                 </div>
             </div>
         </div>
 
-        <!-- 弹幕部分 (气泡样式) -->
+        <!-- 4. 弹幕部分 (修复对话框尖角) -->
         <div class="mb-10 px-2">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-[10px] font-black text-green-500 tracking-widest uppercase">/ Comments 弹幕</h2>
                 <button @click="openInput('bullets')" class="w-6 h-6 bg-green-100 text-green-600 rounded-full">+</button>
             </div>
-            <div class="flex flex-col space-y-4">
+            <div class="flex flex-col space-y-5">
                 <div v-for="(b, i) in currentChar.bullets" :key="i"
-                     @touchstart="startTouch('bullets', i)" @touchend="endTouch"
                      :class="i % 2 === 0 ? 'self-start' : 'self-end'">
-                    <div class="bubble" 
+                    <div class="bullet-bubble" 
+                         @touchstart="startTouch('bullets', i)" @touchend="endTouch"
                          :class="i % 2 === 0 ? 'bubble-left' : 'bubble-right'"
-                         :style="{ backgroundColor: getHueColor(i), color: '#fff' }">
+                         :style="{ backgroundColor: getHueColor(i) }">
                         {{ b }}
                     </div>
                 </div>
@@ -137,11 +137,11 @@
 
     <!-- 操作 -->
     <div v-if="currentChar" class="mt-8 grid grid-cols-2 gap-4 pb-20">
-        <button @click="exportImage" class="bg-gray-800 text-white py-4 rounded-3xl font-bold shadow-lg">导出图片</button>
+        <button @click="exportImage" class="bg-gray-800 text-white py-4 rounded-3xl font-bold">保存卡片</button>
         <button @click="delCharacter" class="bg-red-50 text-red-400 py-4 rounded-3xl font-bold border border-red-100">删除角色</button>
     </div>
 
-    <!-- 全局弹窗 -->
+    <!-- 输入对话框 -->
     <div v-if="showModal" class="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center p-6 z-[100]">
         <div class="bg-white rounded-[2rem] p-6 w-full max-w-sm">
             <h3 class="font-bold mb-4">添加新内容</h3>
@@ -159,7 +159,7 @@
 
     createApp({
         setup() {
-            const characters = ref(JSON.parse(localStorage.getItem('cards_v5')) || []);
+            const characters = ref(JSON.parse(localStorage.getItem('cards_v6')) || []);
             const activeIdx = ref(0);
             const showModal = ref(false);
             const tempInput = ref('');
@@ -167,36 +167,25 @@
             const touchTimer = ref(null);
 
             const currentChar = computed(() => characters.value[activeIdx.value] || null);
-            watch(characters, (v) => localStorage.setItem('cards_v5', JSON.stringify(v)), { deep: true });
+            watch(characters, (v) => localStorage.setItem('cards_v6', JSON.stringify(v)), { deep: true });
 
-            // 核心：生成不重叠的随机坐标
-            const generatePos = (type, existingItems) => {
-                let x, y, r;
-                let attempts = 0;
-                const isTooClose = (nx, ny) => {
-                    return existingItems.some(item => Math.abs(item.x - nx) < 15 && Math.abs(item.y - ny) < 10);
-                };
-
-                do {
-                    if (type === 'tags') {
-                        // 标签区绕开中心头像 (40,40 到 60,60)
-                        x = Math.random() * 85;
-                        y = Math.random() * 80;
-                        if (x > 30 && x < 70 && y > 30 && y < 70) continue; 
-                    } else {
-                        // 细节墙区
-                        x = Math.random() * 70;
-                        y = Math.random() * 90;
-                    }
-                    attempts++;
-                } while (isTooClose(x, y) && attempts < 50);
-
-                r = Math.random() * 30 - 15; // -15到15度随机倾斜
-                return { x, y, r };
+            // 算法：标签生成位置，自动避开中心圆（30%-70%区域）
+            const generateTagPos = () => {
+                let x, y;
+                const safeZones = [
+                    {x:[5,25], y:[5,90]},  // 左侧条
+                    {x:[75,90], y:[5,90]}, // 右侧条
+                    {x:[25,75], y:[5,25]}, // 上方块
+                    {x:[25,75], y:[75,90]} // 下方块
+                ];
+                const zone = safeZones[Math.floor(Math.random() * safeZones.length)];
+                x = Math.random() * (zone.x[1] - zone.x[0]) + zone.x[0];
+                y = Math.random() * (zone.y[1] - zone.y[0]) + zone.y[0];
+                return { x, y, r: Math.random() * 40 - 20 };
             };
 
             const addCharacter = () => {
-                characters.value.push({ id: Date.now(), name: '新角色', avatar: '', tags: [], details: [], bullets: [] });
+                characters.value.push({ id: Date.now(), name: '新角色', avatar: '', tags: [], settings: [], details: [], bullets: [] });
                 activeIdx.value = characters.value.length - 1;
             };
 
@@ -219,27 +208,31 @@
             const confirmAdd = () => {
                 if (!tempInput.value.trim()) return;
                 const type = targetType.value;
+                const colors = ['#FFECF0', '#EBF4FF', '#F0FFF4', '#FFFBEB', '#F5F3FF', '#FFF0E5'];
                 
-                if (type === 'bullets') {
-                    currentChar.value.bullets.push(tempInput.value.trim());
-                } else {
-                    const { x, y, r } = generatePos(type, currentChar.value[type]);
-                    const colors = ['#FFECF0', '#EBF4FF', '#F0FFF4', '#FFFBEB', '#F5F3FF'];
-                    const newItem = {
-                        text: tempInput.value.trim(),
-                        x, y, r,
-                        c: colors[Math.floor(Math.random() * colors.length)]
-                    };
-                    if (type === 'details') {
-                        newItem.type = Math.random() > 0.5 ? 'tape' : 'pin';
-                        newItem.pinC = ['#FF5E5E', '#5EAEFF', '#FFD15E'][Math.floor(Math.random() * 3)];
-                    }
-                    currentChar.value[type].push(newItem);
+                if (type === 'tags') {
+                    const pos = generateTagPos();
+                    currentChar.value.tags.push({ text: tempInput.value, ...pos, c: colors[Math.floor(Math.random()*colors.length)] });
+                } else if (type === 'settings') {
+                    currentChar.value.settings.push(tempInput.value);
+                } else if (type === 'details') {
+                    // 细节墙算法：使用Flex布局的基础，配合随机微调位移(ox, oy)和随机旋转(r)
+                    currentChar.value.details.push({
+                        text: tempInput.value,
+                        c: colors[Math.floor(Math.random()*colors.length)],
+                        r: Math.random() * 20 - 10,
+                        ox: Math.random() * 10 - 5,
+                        oy: Math.random() * 10 - 5,
+                        deco: Math.random() > 0.5 ? 'tape' : 'pin',
+                        pinC: ['#FF5E5E', '#5EAEFF', '#FFD15E'][Math.floor(Math.random()*3)]
+                    });
+                } else if (type === 'bullets') {
+                    currentChar.value.bullets.push(tempInput.value);
                 }
                 showModal.value = false;
             };
 
-            const getHueColor = (i) => `hsl(${(i * 137.5) % 360}, 60%, 65%)`;
+            const getHueColor = (i) => `hsl(${(i * 137.5) % 360}, 65%, 65%)`;
 
             const startTouch = (type, index) => {
                 touchTimer.value = setTimeout(() => {
@@ -252,14 +245,14 @@
                 const area = document.getElementById('capture-area');
                 document.body.classList.add('exporting');
                 setTimeout(() => {
-                    html2canvas(area, { useCORS: true, scale: 3, backgroundColor: '#f7f8fa' }).then(canvas => {
+                    html2canvas(area, { useCORS: true, scale: 3, backgroundColor: '#f0f2f5' }).then(canvas => {
                         const link = document.createElement('a');
-                        link.download = `${currentChar.value.name}.png`;
+                        link.download = `${currentChar.value.name}_卡册.png`;
                         link.href = canvas.toDataURL();
                         link.click();
                         document.body.classList.remove('exporting');
                     });
-                }, 300);
+                }, 400);
             };
 
             const delCharacter = () => {
