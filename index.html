@@ -3,191 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色档案卡册</title>
-    <!-- 引入 Tailwind CSS -->
+    <title>幻色角色卡册</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 html2canvas 用于导出图片 -->
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <!-- 引入 Vue 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap');
-        
+        @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+
+        :root {
+            --m-blue: #e0f2fe; --m-pink: #fce7f3; --m-yellow: #fef3c7; --m-green: #dcfce7;
+        }
+
         body {
-            font-family: 'Noto Sans SC', sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
             min-height: 100vh;
-            margin: 0;
-            padding-bottom: 100px;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* 导出时的兼容性处理 */
+        .exporting .glass {
+            backdrop-filter: none !important;
+            background: rgba(255, 255, 255, 0.9) !important;
         }
 
         .glass {
-            background: rgba(255, 255, 255, 0.4);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
         }
 
-        /* 长按震动反馈模拟动画 */
-        .shake {
-            animation: shake 0.5s infinite;
+        /* 标签环绕动画 */
+        .tag-float {
+            position: absolute;
+            animation: float 4s ease-in-out infinite;
         }
-        @keyframes shake {
-            0% { transform: rotate(0deg); }
-            25% { transform: rotate(1deg); }
-            75% { transform: rotate(-1deg); }
-            100% { transform: rotate(0deg); }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(var(--r)); }
+            50% { transform: translateY(-5px) rotate(var(--r)); }
         }
 
-        /* 隐藏滚动条 */
-        ::-webkit-scrollbar { display: none; }
+        /* 便签样式 */
+        .sticky-note {
+            transition: transform 0.3s;
+            box-shadow: 2px 4px 10px rgba(0,0,0,0.05);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body>
 <div id="app" class="p-4 max-w-md mx-auto">
     
-    <!-- 顶部导航 -->
+    <!-- 顶部控制栏 -->
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold text-gray-700">我的卡册</h1>
-        <button @click="addCharacter" class="bg-white/60 p-2 rounded-full shadow-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-        </button>
+        <h1 style="font-family: 'ZCOOL KuaiLe';" class="text-3xl text-gray-700">角色卡册</h1>
+        <div class="flex gap-2">
+            <button @click="addCharacter" class="bg-blue-400 text-white p-2 rounded-full shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+            </button>
+        </div>
     </div>
 
-    <!-- 角色列表切换 -->
-    <div class="flex space-x-2 overflow-x-auto mb-6 pb-2">
+    <!-- 角色切换 -->
+    <div class="flex space-x-3 overflow-x-auto no-scrollbar mb-6 py-2">
         <div v-for="(char, index) in characters" :key="char.id" 
              @click="activeIdx = index"
-             class="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all"
-             :class="activeIdx === index ? 'bg-blue-400 text-white' : 'bg-white/50 text-gray-500'">
+             class="flex-shrink-0 px-5 py-2 rounded-2xl text-sm font-bold transition-all shadow-sm"
+             :class="activeIdx === index ? 'bg-gray-800 text-white scale-105' : 'bg-white text-gray-400'">
             {{ char.name || '未命名' }}
         </div>
     </div>
 
-    <!-- 核心卡片区域 (将被导出) -->
-    <div v-if="currentChar" id="capture-area" class="glass rounded-[2rem] p-6 relative transition-all overflow-hidden">
+    <!-- 核心卡片 (Capture Area) -->
+    <div v-if="currentChar" id="capture-area" class="glass rounded-[2.5rem] p-6 pb-12 relative overflow-hidden min-h-[700px]">
         
-        <!-- 背景装饰色块 -->
-        <div class="absolute -top-10 -right-10 w-40 h-40 bg-blue-200/30 rounded-full blur-3xl"></div>
-        <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-pink-200/30 rounded-full blur-3xl"></div>
-
-        <!-- 头像与名称 -->
-        <div class="flex flex-col items-center mb-8 relative">
-            <div @click="triggerUpload" class="w-32 h-32 rounded-full border-4 border-white overflow-hidden shadow-lg bg-gray-100 mb-4">
-                < img v-if="currentChar.avatar" :src="currentChar.avatar" class="w-full h-full object-cover">
-                <div v-else class="w-full h-full flex items-center justify-center text-gray-400">点击上传</div>
-            </div>
-            <input type="text" v-model="currentChar.name" placeholder="点击输入角色名" 
-                   class="bg-transparent text-center text-xl font-bold text-gray-800 outline-none border-b border-transparent focus:border-gray-300">
-            <input type="file" id="avatar-input" class="hidden" @change="handleAvatar">
+        <!-- 背景装饰 -->
+        <div class="absolute top-0 left-0 w-full h-full opacity-30 pointer-events-none">
+            <div class="absolute top-10 left-10 w-32 h-32 bg-pink-200 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-20 right-10 w-32 h-32 bg-blue-200 rounded-full blur-3xl"></div>
         </div>
 
-        <!-- 板块1：标签 (蓝色胶囊) -->
-        <div class="mb-6">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-blue-400 uppercase tracking-widest">Tags / 标签</span>
-                <button @click="addItem('tags')" class="text-blue-400 text-xl">+</button>
+        <!-- 头像与标签环绕区 -->
+        <div class="relative h-64 flex items-center justify-center mb-4">
+            <!-- 环绕标签 -->
+            <div v-for="(tag, i) in currentChar.tags" :key="i"
+                 class="tag-float px-3 py-1 rounded-full text-xs font-bold border border-white/50 shadow-sm"
+                 :style="getTagStyle(i)"
+                 @touchstart="startTouch('tags', i)" @touchend="endTouch">
+                # {{ tag }}
+            </div>
+
+            <!-- 头像 -->
+            <div @click="triggerUpload" class="z-10 w-36 h-36 rounded-full border-8 border-white shadow-2xl overflow-hidden bg-gray-50 flex items-center justify-center">
+                < img v-if="currentChar.avatar" :src="currentChar.avatar" class="w-full h-full object-cover">
+                <div v-else class="text-gray-300 text-center text-sm">点击<br>上传图库</div>
+            </div>
+            <input type="file" id="avatar-input" class="hidden" accept="image/*" @change="handleAvatar">
+            
+            <!-- 角色名 -->
+            <input type="text" v-model="currentChar.name" 
+                   class="absolute bottom-0 bg-white/80 px-4 py-1 rounded-full text-lg font-bold text-gray-700 outline-none shadow-sm text-center">
+        </div>
+
+        <!-- 设定板块 (横向胶囊) -->
+        <div class="mb-8">
+            <div class="flex justify-between items-center px-2 mb-3">
+                <span class="text-[10px] font-black text-pink-400 tracking-widest uppercase">Attributes / 设定</span>
+                <button @click="addItem('settings')" class="w-6 h-6 bg-pink-100 text-pink-500 rounded-full">+</button>
             </div>
             <div class="flex flex-wrap gap-2">
-                <div v-for="(item, i) in currentChar.tags" :key="i"
-                     @touchstart="startTouch('tags', i)" @touchend="endTouch"
-                     class="px-3 py-1 bg-blue-100/60 text-blue-600 rounded-full text-sm border border-blue-200">
-                    # {{ item }}
-                </div>
-            </div>
-        </div>
-
-        <!-- 板块2：设定 (粉色边框) -->
-        <div class="mb-6">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-pink-400 uppercase tracking-widest">Settings / 设定</span>
-                <button @click="addItem('settings')" class="text-pink-400 text-xl">+</button>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <div v-for="(item, i) in currentChar.settings" :key="i"
+                <div v-for="(s, i) in currentChar.settings" :key="i"
                      @touchstart="startTouch('settings', i)" @touchend="endTouch"
-                     class="p-2 border-2 border-dashed border-pink-200 rounded-xl text-pink-700 text-xs text-center">
-                    {{ item }}
+                     class="px-4 py-1.5 bg-pink-100/80 text-pink-600 rounded-lg text-xs font-bold rotate-[-1deg]">
+                    {{ s }}
                 </div>
             </div>
         </div>
 
-        <!-- 板块3：细节 (黄色笔记) -->
-        <div class="mb-6">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-yellow-500 uppercase tracking-widest">Details / 细节</span>
-                <button @click="addItem('details')" class="text-yellow-500 text-xl">+</button>
+        <!-- 细节便签墙 (随意摆放感) -->
+        <div class="mb-8 relative min-h-[200px]">
+            <div class="flex justify-between items-center px-2 mb-3">
+                <span class="text-[10px] font-black text-yellow-500 tracking-widest uppercase">Memories / 细节</span>
+                <button @click="addItem('details')" class="w-6 h-6 bg-yellow-100 text-yellow-600 rounded-full">+</button>
             </div>
-            <div class="space-y-2">
-                <div v-for="(item, i) in currentChar.details" :key="i"
+            <div class="flex flex-wrap gap-3">
+                <div v-for="(d, i) in currentChar.details" :key="i"
                      @touchstart="startTouch('details', i)" @touchend="endTouch"
-                     class="p-3 bg-yellow-50/80 rounded-lg text-gray-700 text-sm shadow-sm border-l-4 border-yellow-300">
-                    {{ item }}
+                     class="sticky-note p-3 rounded-sm text-sm text-gray-700 max-w-[80%]"
+                     :style="getNoteStyle(i)">
+                    {{ d }}
                 </div>
             </div>
         </div>
 
-        <!-- 板块4：弹幕 (绿色气泡) -->
-        <div class="mb-4">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-green-500 uppercase tracking-widest">Comments / 评价</span>
-                <button @click="addItem('bullets')" class="text-green-500 text-xl">+</button>
+        <!-- 弹幕板块 (嘴毒气泡) -->
+        <div>
+            <div class="flex justify-between items-center px-2 mb-3">
+                <span class="text-[10px] font-black text-green-500 tracking-widest uppercase">Bullets / 弹幕</span>
+                <button @click="addItem('bullets')" class="w-6 h-6 bg-green-100 text-green-600 rounded-full">+</button>
             </div>
-            <div class="flex flex-col space-y-2">
-                <div v-for="(item, i) in currentChar.bullets" :key="i"
+            <div class="space-y-3">
+                <div v-for="(b, i) in currentChar.bullets" :key="i"
                      @touchstart="startTouch('bullets', i)" @touchend="endTouch"
-                     class="self-start px-4 py-2 bg-green-400 text-white rounded-t-2xl rounded-br-2xl text-xs shadow-sm ml-2 relative">
-                     <span class="absolute -left-2 bottom-0 w-0 h-0 border-8 border-transparent border-r-green-400"></span>
-                    {{ item }}
+                     class="flex items-start gap-2" :class="i % 2 === 0 ? '' : 'flex-row-reverse'">
+                    <div class="bg-green-400 text-white px-3 py-2 rounded-2xl rounded-bl-none text-xs shadow-sm">
+                        {{ b }}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 操作按钮区 -->
-    <div v-if="currentChar" class="mt-8 flex space-x-4">
-        <button @click="exportImage" class="flex-1 bg-indigo-500 text-white py-3 rounded-2xl font-bold shadow-lg active:scale-95 transition-transform">
-            导出图片卡册
+    <!-- 操作 -->
+    <div class="mt-8 grid grid-cols-2 gap-4">
+        <button @click="exportImage" class="bg-gradient-to-r from-blue-400 to-indigo-500 text-white py-4 rounded-3xl font-bold shadow-xl">
+            保存到手机
         </button>
-        <button @click="delCharacter" class="px-6 py-3 bg-red-100 text-red-500 rounded-2xl font-bold active:scale-95 transition-transform">
+        <button @click="delCharacter" class="bg-white text-red-400 py-4 rounded-3xl font-bold border border-red-100">
             删除角色
         </button>
     </div>
 
-    <!-- 底部提示 -->
-    <p class="text-center text-gray-400 text-xs mt-6">提示：点击 "+" 添加内容，长按条目可删除</p >
-
-    <!-- 输入对话框 (简易版) -->
-    <div v-if="showModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-6 z-50">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-bold mb-4">添加新内容</h3>
-            <textarea v-model="tempInput" class="w-full h-24 p-3 bg-gray-100 rounded-xl outline-none mb-4" placeholder="请输入内容..."></textarea>
-            <div class="flex space-x-3">
-                <button @click="showModal = false" class="flex-1 py-2 text-gray-500 font-medium">取消</button>
-                <button @click="confirmAdd" class="flex-1 py-2 bg-blue-500 text-white rounded-xl font-medium">确认</button>
+    <!-- 输入弹窗 -->
+    <div v-if="showModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 z-50">
+        <div class="bg-white rounded-[2rem] p-8 w-full">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">写点什么...</h3>
+            <textarea v-model="tempInput" autofocus class="w-full h-32 p-4 bg-gray-50 rounded-2xl outline-none mb-6 border-2 border-gray-100 focus:border-blue-300 transition-all"></textarea>
+            <div class="flex gap-4">
+                <button @click="showModal = false" class="flex-1 py-3 text-gray-400 font-bold">取消</button>
+                <button @click="confirmAdd" class="flex-1 py-3 bg-blue-500 text-white rounded-2xl font-bold shadow-lg shadow-blue-200">添加</button>
             </div>
         </div>
     </div>
+
+    <p class="text-center text-gray-400 text-xs mt-8 mb-12">提示：长按内容即可删除</p >
 </div>
 
 <script>
-    const { createApp, ref, computed, onMounted, watch } = Vue;
+    const { createApp, ref, computed, watch } = Vue;
 
     createApp({
         setup() {
-            // 数据结构
-            const characters = ref(JSON.parse(localStorage.getItem('my_chars')) || [
+            const characters = ref(JSON.parse(localStorage.getItem('char_v2')) || [
                 {
                     id: Date.now(),
-                    name: '示例角色',
+                    name: '沈星回',
                     avatar: '',
-                    tags: ['年上', '纯爱'],
-                    settings: ['戴眼镜', '黑色风衣'],
-                    details: ['喝咖啡从不加糖', '紧张时会下意识摸左手手链'],
-                    bullets: ['这CP真的太好嗑了！', '这也太苏了吧...']
+                    tags: ['年上', '纯爱', '骨科', '温柔'],
+                    settings: ['喜欢睡觉', '光能进化', '猎人'],
+                    details: ['他其实一直记得那个约定', '接吻的时候会轻轻颤抖'],
+                    bullets: ['这CP太好嗑了！', '老沈你别太荒谬']
                 }
             ]);
 
@@ -196,30 +205,38 @@
             const tempInput = ref('');
             const targetType = ref('');
             const touchTimer = ref(null);
+            const isExporting = ref(false);
 
-            const currentChar = computed(() => characters.value[activeIdx.ref] || characters.value[activeIdx.value]);
+            const currentChar = computed(() => characters.value[activeIdx.value]);
 
-            // 持久化存储
             watch(characters, (newVal) => {
-                localStorage.setItem('my_chars', JSON.stringify(newVal));
+                localStorage.setItem('char_v2', JSON.stringify(newVal));
             }, { deep: true });
 
-            const addCharacter = () => {
-                const newChar = {
-                    id: Date.now(),
-                    name: '新角色',
-                    avatar: '',
-                    tags: [], settings: [], details: [], bullets: []
+            // 标签环绕位置算法
+            const getTagStyle = (index) => {
+                const angle = (index * (360 / (currentChar.value.tags.length || 1))) - 90;
+                const radius = 100; // 距离中心的距离
+                const x = Math.cos(angle * Math.PI / 180) * radius;
+                const y = Math.sin(angle * Math.PI / 180) * radius;
+                const colors = ['#dbeafe', '#fce7f3', '#fef3c7', '#dcfce7'];
+                return {
+                    left: `calc(50% + ${x}px - 20px)`,
+                    top: `calc(50% + ${y}px - 10px)`,
+                    backgroundColor: colors[index % 4],
+                    '--r': `${(Math.random() * 20 - 10)}deg`
                 };
-                characters.value.push(newChar);
-                activeIdx.value = characters.value.length - 1;
             };
 
-            const delCharacter = () => {
-                if(confirm('确定要永久删除这个角色吗？')) {
-                    characters.value.splice(activeIdx.value, 1);
-                    if(activeIdx.value > 0) activeIdx.value--;
-                }
+            // 便签墙随机样式
+            const getNoteStyle = (index) => {
+                const colors = ['#fff9c4', '#ffecb3', '#f8bbd0', '#e1f5fe', '#f3e5f5'];
+                const rotates = ['-2deg', '1deg', '-1.5deg', '2.5deg', '-3deg'];
+                return {
+                    backgroundColor: colors[index % colors.length],
+                    transform: `rotate(${rotates[index % rotates.length]})`,
+                    marginLeft: `${(index % 3) * 5}px`
+                };
             };
 
             const triggerUpload = () => document.getElementById('avatar-input').click();
@@ -246,38 +263,56 @@
                 }
             };
 
-            // 长按删除交互逻辑
             const startTouch = (type, index) => {
                 touchTimer.value = setTimeout(() => {
-                    if(confirm('要删除这条内容吗？')) {
+                    if(confirm('确认删除这条内容？')) {
                         currentChar.value[type].splice(index, 1);
                     }
-                }, 800); // 800毫秒触发长按
+                }, 700);
             };
 
-            const endTouch = () => {
-                clearTimeout(touchTimer.value);
+            const endTouch = () => clearTimeout(touchTimer.value);
+
+            const addCharacter = () => {
+                const c = { id: Date.now(), name: '新角色', avatar: '', tags: [], settings: [], details: [], bullets: [] };
+                characters.value.push(c);
+                activeIdx.value = characters.value.length - 1;
             };
 
-            // 导出图片
+            const delCharacter = () => {
+                if(confirm('彻底删除该角色？')) {
+                    characters.value.splice(activeIdx.value, 1);
+                    activeIdx.value = 0;
+                }
+            };
+
+            // 导出逻辑：重点解决偏移问题
             const exportImage = () => {
                 const area = document.getElementById('capture-area');
-                html2canvas(area, {
-                    backgroundColor: null,
-                    scale: 2, // 提高清晰度
-                    useCORS: true
-                }).then(canvas => {
-                    const link = document.createElement('a');
-                    link.download = `${currentChar.value.name}_记录卡.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                });
+                document.body.classList.add('exporting'); // 临时禁用毛玻璃
+                
+                // 延迟执行确保CSS生效
+                setTimeout(() => {
+                    html2canvas(area, {
+                        useCORS: true,
+                        scale: 3, // 极高清晰度
+                        backgroundColor: '#f3f4f6',
+                        logging: false,
+                        allowTaint: true
+                    }).then(canvas => {
+                        const link = document.createElement('a');
+                        link.download = `${currentChar.value.name}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                        document.body.classList.remove('exporting');
+                    });
+                }, 100);
             };
 
             return {
                 characters, activeIdx, currentChar, showModal, tempInput,
-                addCharacter, delCharacter, triggerUpload, handleAvatar,
-                addItem, confirmAdd, startTouch, endTouch, exportImage
+                getTagStyle, getNoteStyle, triggerUpload, handleAvatar,
+                addItem, confirmAdd, startTouch, endTouch, addCharacter, delCharacter, exportImage
             }
         }
     }).mount('#app');
